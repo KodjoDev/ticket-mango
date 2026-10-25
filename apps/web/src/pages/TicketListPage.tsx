@@ -1,50 +1,59 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
-  COMPONENT_LABELS,
-  COMPONENTS,
-  isOpenStatus,
+  LIST_COLUMN_LABELS,
   PRIORITIES,
   PRIORITY_LABELS,
   STATUS_LABELS,
   TICKET_STATUSES,
-  TICKET_TYPE_LABELS,
-  TICKET_TYPES,
-  type Component,
-  type Priority,
-  type TicketStatus,
-  type TicketType,
+  type ListColumn,
 } from '@ticketing/shared';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { api } from '../api/client';
-import type { TicketFilters } from '../api/types';
+import type { Ticket } from '../api/types';
 import { useAuth, useCurrentUser } from '../auth/AuthContext';
-import { Avatar, ErrorMessage, formatDate, options, PriorityBadge, Spinner, StatusBadge } from '../components/ui';
+import { TagList } from '../components/tags';
+import { Avatar, ErrorMessage, formatDate, PriorityBadge, Spinner, StatusBadge } from '../components/ui';
+import { useConfig, type ConfigHelpers } from '../config/ConfigContext';
+import { filtersFromParams, PAGE_SIZE } from '../filters';
 
-const PAGE_SIZE = 25;
-const OPEN_STATUSES = TICKET_STATUSES.filter(isOpenStatus);
+/** Contenu d'une cellule pour chaque colonne configurable. */
+const CELLS: Record<ListColumn, (t: Ticket, config: ConfigHelpers) => ReactNode> = {
+  id: (t) => <span className="muted">{t.id}</span>,
+  subject: (t) => <Link to={`/tickets/${t.id}`}>{t.subject}</Link>,
+  priority: (t) => <PriorityBadge priority={t.priority} />,
+  status: (t) => <StatusBadge status={t.status} />,
+  type: (t, c) => c.label('TYPE', t.type),
+  component: (t, c) => c.label('COMPONENT', t.component),
+  environment: (t, c) => c.label('ENVIRONMENT', t.environment),
+  tags: (t) => <TagList tags={t.tags} />,
+  requester: (t) => t.requester.name,
+  assignee: (t) =>
+    t.assignee ? (
+      <span className="assignee-cell">
+        <Avatar name={t.assignee.name} size="sm" />
+        {t.assignee.name}
+      </span>
+    ) : (
+      <span className="muted">Non assigné</span>
+    ),
+  createdAt: (t) => <span className="nowrap">{formatDate(t.createdAt)}</span>,
+  updatedAt: (t) => <span className="nowrap">{formatDate(t.updatedAt)}</span>,
+};
 
-/** Les filtres vivent dans l'URL : une vue filtrée se partage par simple lien. */
-export function filtersFromParams(params: URLSearchParams, userId: string): TicketFilters {
-  const status = params.get('status') ?? 'open';
-  return {
-    status: status === 'open' ? OPEN_STATUSES : status === 'all' ? undefined : [status as TicketStatus],
-    priority: params.get('priority') ? [params.get('priority') as Priority] : undefined,
-    type: (params.get('type') as TicketType) || undefined,
-    component: (params.get('component') as Component) || undefined,
-    assigneeId: params.get('mine') === '1' ? userId : undefined,
-    q: params.get('q') || undefined,
-    page: Number(params.get('page')) || 1,
-    pageSize: PAGE_SIZE,
-  };
+/** Valeur d'un sélecteur dont l'URL peut contenir plusieurs valeurs (ex. vue « P0 / P1 »). */
+function single(value: string | null): string {
+  return value && !value.includes(',') ? value : value ? '__multi' : '';
 }
 
 export function TicketListPage() {
   const user = useCurrentUser();
   const { can } = useAuth();
+  const config = useConfig();
   const [params, setParams] = useSearchParams();
   const filters = filtersFromParams(params, user.id);
   const [search, setSearch] = useState(params.get('q') ?? '');
+  const columns = config.listColumns.filter((c) => c.visible).map((c) => c.key);
 
   const { data, error, isPending, isFetching } = useQuery({
     queryKey: ['tickets', filters],
@@ -75,11 +84,12 @@ export function TicketListPage() {
 
   const page = filters.page ?? 1;
   const pageCount = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
+  const status = params.get('status') ?? 'open';
 
   return (
     <>
       <header className="page-header">
-        <h1>Tickets</h1>
+        <h1>{can('ticket:read:all') ? 'Tickets' : 'Mes demandes'}</h1>
         {can('ticket:create') && (
           <Link to="/tickets/new" className="button primary">
             Nouveau ticket
@@ -95,36 +105,65 @@ export function TicketListPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select aria-label="Statut" value={params.get('status') ?? 'open'} onChange={(e) => setParam('status', e.target.value)}>
+        <select aria-label="Statut" value={['open', 'all'].includes(status) ? status : single(status)} onChange={(e) => setParam('status', e.target.value)}>
           <option value="open">Ouverts</option>
           <option value="all">Tous les statuts</option>
-          {options(TICKET_STATUSES, STATUS_LABELS)}
+          {status.includes(',') && (
+            <option value="__multi" disabled>
+              Plusieurs statuts
+            </option>
+          )}
+          {TICKET_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABELS[s]}
+            </option>
+          ))}
         </select>
-        <select aria-label="Priorité" value={params.get('priority') ?? ''} onChange={(e) => setParam('priority', e.target.value)}>
+        <select aria-label="Priorité" value={single(params.get('priority'))} onChange={(e) => setParam('priority', e.target.value)}>
           <option value="">Toutes priorités</option>
-          {options(PRIORITIES, PRIORITY_LABELS)}
+          {params.get('priority')?.includes(',') && (
+            <option value="__multi" disabled>
+              {params.get('priority')!.replace(',', ' / ')}
+            </option>
+          )}
+          {PRIORITIES.map((p) => (
+            <option key={p} value={p}>
+              {PRIORITY_LABELS[p]}
+            </option>
+          ))}
         </select>
         <select aria-label="Type" value={params.get('type') ?? ''} onChange={(e) => setParam('type', e.target.value)}>
           <option value="">Tous types</option>
-          {options(TICKET_TYPES, TICKET_TYPE_LABELS)}
+          {config.choices('TYPE', params.get('type')).map((o) => (
+            <option key={o.key} value={o.key}>
+              {o.label}
+            </option>
+          ))}
         </select>
-        <select
-          aria-label="Module"
-          value={params.get('component') ?? ''}
-          onChange={(e) => setParam('component', e.target.value)}
-        >
+        <select aria-label="Module" value={params.get('component') ?? ''} onChange={(e) => setParam('component', e.target.value)}>
           <option value="">Tous modules</option>
-          {options(COMPONENTS, COMPONENT_LABELS)}
+          {config.choices('COMPONENT', params.get('component')).map((o) => (
+            <option key={o.key} value={o.key}>
+              {o.label}
+            </option>
+          ))}
         </select>
-        {can('ticket:transition') && (
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={params.get('mine') === '1'}
-              onChange={(e) => setParam('mine', e.target.checked ? '1' : null)}
-            />
-            Assignés à moi
-          </label>
+        {config.tags.length > 0 && (
+          <select aria-label="Tag" value={params.get('tag') ?? ''} onChange={(e) => setParam('tag', e.target.value)}>
+            <option value="">Tous tags</option>
+            {config.tags.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        )}
+        {can('ticket:read:all') && (
+          <select aria-label="Assignation" value={params.get('assignee') ?? ''} onChange={(e) => setParam('assignee', e.target.value)}>
+            <option value="">Toutes assignations</option>
+            <option value="me">Assignés à moi</option>
+            <option value="none">Non assignés</option>
+          </select>
         )}
       </div>
 
@@ -139,43 +178,19 @@ export function TicketListPage() {
             <table className="tickets">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Sujet</th>
-                  <th>Priorité</th>
-                  <th>Statut</th>
-                  <th>Type</th>
-                  <th>Module</th>
-                  <th>Assigné</th>
-                  <th>Créé le</th>
+                  {columns.map((c) => (
+                    <th key={c}>{LIST_COLUMN_LABELS[c]}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {data.items.map((t) => (
                   <tr key={t.id}>
-                    <td className="muted">{t.id}</td>
-                    <td className="subject">
-                      <Link to={`/tickets/${t.id}`}>{t.subject}</Link>
-                      <div className="muted small">{t.requester.name}</div>
-                    </td>
-                    <td>
-                      <PriorityBadge priority={t.priority} />
-                    </td>
-                    <td>
-                      <StatusBadge status={t.status} />
-                    </td>
-                    <td>{TICKET_TYPE_LABELS[t.type]}</td>
-                    <td>{t.component ? COMPONENT_LABELS[t.component] : '—'}</td>
-                    <td>
-                      {t.assignee ? (
-                        <span className="assignee-cell">
-                          <Avatar name={t.assignee.name} size="sm" />
-                          {t.assignee.name}
-                        </span>
-                      ) : (
-                        <span className="muted">Non assigné</span>
-                      )}
-                    </td>
-                    <td className="nowrap">{formatDate(t.createdAt)}</td>
+                    {columns.map((c) => (
+                      <td key={c} className={c === 'subject' ? 'subject' : undefined}>
+                        {CELLS[c](t, config)}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>

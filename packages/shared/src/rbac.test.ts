@@ -24,7 +24,8 @@ describe('RBAC', () => {
     expect(hasPermission('EXTERNAL_USER', 'ticket:transition')).toBe(false);
   });
 
-  it('réserve la gestion des utilisateurs à l’administrateur', () => {
+  it('réserve l’administration à l’administrateur', () => {
     expect(hasPermission('AGENT_N2', 'user:manage')).toBe(false);
+    expect(hasPermission('AGENT_N2', 'settings:manage')).toBe(false);
   });
 });

@@ -1,32 +1,28 @@
 import type { PrismaClient } from '@prisma/client';
-import {
-  COMPONENTS,
-  ENVIRONMENTS,
-  IMPACTS,
-  PRIORITIES,
-  TICKET_STATUSES,
-  TICKET_TYPES,
-  URGENCIES,
-} from '@ticketing/shared';
+import { IMPACTS, OPTION_KEY_PATTERN, PRIORITIES, TICKET_STATUSES, URGENCIES } from '@ticketing/shared';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import type { ConfigService } from '../services/config';
 import { isStaff, TicketService } from '../services/tickets';
 
 const subject = z.string().trim().min(1).max(250);
 const description = z.string().trim().min(1).max(50_000);
+// Les valeurs de liste sont administrables : leur existence est vérifiée par le service.
+const optionKey = z.string().regex(OPTION_KEY_PATTERN, 'Clé de liste invalide');
 
 const staffCreateSchema = z
   .object({
     subject,
     description,
-    type: z.enum(TICKET_TYPES).optional(),
-    component: z.enum(COMPONENTS).nullable().optional(),
-    environment: z.enum(ENVIRONMENTS).nullable().optional(),
+    type: optionKey.optional(),
+    component: optionKey.nullable().optional(),
+    environment: optionKey.nullable().optional(),
     impact: z.enum(IMPACTS).optional(),
     urgency: z.enum(URGENCIES).optional(),
     priority: z.enum(PRIORITIES).optional(),
     requesterId: z.string().uuid().optional(),
     assigneeId: z.string().uuid().nullable().optional(),
+    tagIds: z.array(z.string().uuid()).max(50).optional(),
   })
   .strict();
 
@@ -51,9 +47,10 @@ const csv = <T extends readonly [string, ...string[]]>(values: T) =>
 const listQuerySchema = z.object({
   status: csv(TICKET_STATUSES),
   priority: csv(PRIORITIES),
-  type: z.enum(TICKET_TYPES).optional(),
-  component: z.enum(COMPONENTS).optional(),
-  assigneeId: z.string().uuid().optional(),
+  type: optionKey.optional(),
+  component: optionKey.optional(),
+  assigneeId: z.union([z.string().uuid(), z.literal('none')]).optional(),
+  tagId: z.string().uuid().optional(),
   q: z.string().trim().min(1).max(200).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
@@ -65,8 +62,11 @@ const commentSchema = z
   .object({ body: z.string().trim().min(1).max(50_000), isInternal: z.boolean().default(false) })
   .strict();
 
-export const ticketRoutes: FastifyPluginAsync<{ prisma: PrismaClient }> = async (app, { prisma }) => {
-  const tickets = new TicketService(prisma);
+export const ticketRoutes: FastifyPluginAsync<{ prisma: PrismaClient; config: ConfigService }> = async (
+  app,
+  { prisma, config },
+) => {
+  const tickets = new TicketService(prisma, config);
 
   app.addHook('preHandler', app.authenticate);
 

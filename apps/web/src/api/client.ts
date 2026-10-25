@@ -1,5 +1,28 @@
-import type { TicketStatus } from '@ticketing/shared';
-import type { Agent, AuditEntry, Comment, Page, Ticket, TicketFilters, TicketInput, User } from './types';
+import type {
+  LayoutItem,
+  ListColumn,
+  OptionField,
+  PriorityMatrix,
+  Role,
+  TicketFormField,
+  TicketStatus,
+  ViewFilters,
+} from '@ticketing/shared';
+import type {
+  Agent,
+  AppConfig,
+  AuditEntry,
+  Comment,
+  FieldOption,
+  ManagedUser,
+  Page,
+  Tag,
+  Ticket,
+  TicketFilters,
+  TicketInput,
+  User,
+  View,
+} from './types';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
 
@@ -66,4 +89,38 @@ export const api = {
     request<Comment>('POST', `/tickets/${id}/comments`, { body, isInternal }),
 
   audit: (id: number) => request<AuditEntry[]>('GET', `/tickets/${id}/audit`),
+
+  config: () => request<AppConfig>('GET', '/config'),
+  views: () => request<View[]>('GET', '/views'),
+};
+
+/** Routes d'administration (permissions user:manage et settings:manage). */
+export const adminApi = {
+  users: () => request<ManagedUser[]>('GET', '/users'),
+  createUser: (input: { email: string; name: string; password: string; role: Role }) =>
+    request<ManagedUser>('POST', '/users', input),
+  updateUser: (id: string, input: Partial<{ name: string; role: Role; isActive: boolean; password: string }>) =>
+    request<ManagedUser>('PATCH', `/users/${id}`, input),
+
+  createOption: (input: { field: OptionField; key: string; label: string }) =>
+    request<FieldOption>('POST', '/admin/options', input),
+  updateOption: (id: string, input: Partial<{ label: string; isActive: boolean }>) =>
+    request<FieldOption>('PATCH', `/admin/options/${id}`, input),
+  reorderOptions: (field: OptionField, ids: string[]) => request<FieldOption[]>('PUT', '/admin/options/order', { field, ids }),
+  deleteOption: (id: string) => request<void>('DELETE', `/admin/options/${id}`),
+
+  savePriorityMatrix: (matrix: PriorityMatrix) => request<PriorityMatrix>('PUT', '/admin/priority-matrix', matrix),
+  saveTicketForm: (layout: LayoutItem<TicketFormField>[]) => request('PUT', '/admin/layout/ticket-form', layout),
+  saveListColumns: (layout: LayoutItem<ListColumn>[]) => request('PUT', '/admin/layout/list-columns', layout),
+
+  createTag: (input: { name: string; color: string }) => request<Tag>('POST', '/admin/tags', input),
+  updateTag: (id: string, input: Partial<{ name: string; color: string; isActive: boolean }>) =>
+    request<Tag>('PATCH', `/admin/tags/${id}`, input),
+  deleteTag: (id: string) => request<void>('DELETE', `/admin/tags/${id}`),
+
+  createView: (input: { name: string; filters: ViewFilters }) => request<View>('POST', '/admin/views', input),
+  updateView: (id: string, input: Partial<{ name: string; filters: ViewFilters }>) =>
+    request<View>('PATCH', `/admin/views/${id}`, input),
+  reorderViews: (ids: string[]) => request<View[]>('PUT', '/admin/views/order', { ids }),
+  deleteView: (id: string) => request<void>('DELETE', `/admin/views/${id}`),
 };

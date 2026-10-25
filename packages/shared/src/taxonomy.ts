@@ -1,36 +1,33 @@
 /**
  * Taxonomie des tickets (CdC §3.1).
- * Les valeurs sont identiques aux enums Prisma de l'API : toute modification
- * doit être répercutée dans apps/api/prisma/schema.prisma.
+ * Les valeurs des listes (types, modules, environnements) sont administrables et
+ * stockées en base (FieldOption) ; seules leurs clés circulent dans l'API.
  */
 
-export const TICKET_TYPES = ['BUG', 'FEATURE_REQUEST', 'QUESTION', 'MAJOR_INCIDENT'] as const;
-export type TicketType = (typeof TICKET_TYPES)[number];
+export const OPTION_FIELDS = ['TYPE', 'COMPONENT', 'ENVIRONMENT'] as const;
+export type OptionField = (typeof OPTION_FIELDS)[number];
 
-export const COMPONENTS = ['FRONTEND', 'API', 'DATABASE', 'BILLING', 'AUTH', 'OTHER'] as const;
-export type Component = (typeof COMPONENTS)[number];
-
-export const ENVIRONMENTS = ['PRODUCTION', 'STAGING', 'ACCEPTANCE'] as const;
-export type Environment = (typeof ENVIRONMENTS)[number];
-
-export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
-  BUG: 'Bug / Incident technique',
-  FEATURE_REQUEST: "Demande d'évolution",
-  QUESTION: 'Question / Assistance',
-  MAJOR_INCIDENT: 'Incident majeur (crise)',
+export const OPTION_FIELD_LABELS: Record<OptionField, string> = {
+  TYPE: 'Types de demande',
+  COMPONENT: 'Modules',
+  ENVIRONMENT: 'Environnements',
 };
 
-export const COMPONENT_LABELS: Record<Component, string> = {
-  FRONTEND: 'Frontend',
-  API: 'API',
-  DATABASE: 'Base de données',
-  BILLING: 'Facturation',
-  AUTH: 'Authentification',
-  OTHER: 'Autre',
-};
+/** Champ du ticket qui porte la clé de chaque liste. */
+export const OPTION_FIELD_TICKET_KEY = {
+  TYPE: 'type',
+  COMPONENT: 'component',
+  ENVIRONMENT: 'environment',
+} as const satisfies Record<OptionField, string>;
 
-export const ENVIRONMENT_LABELS: Record<Environment, string> = {
-  PRODUCTION: 'Production',
-  STAGING: 'Staging / Préprod',
-  ACCEPTANCE: 'Recette',
-};
+/** Clés de type dont dépend le comportement de l'application : renommables, jamais archivées. */
+export const SYSTEM_TYPE_KEYS = {
+  bug: 'BUG',
+  question: 'QUESTION',
+  majorIncident: 'MAJOR_INCIDENT',
+} as const;
+
+export const DEFAULT_TICKET_TYPE = SYSTEM_TYPE_KEYS.question;
+
+/** Une clé est un code stable en majuscules (ex. BILLING, MOBILE_APP). */
+export const OPTION_KEY_PATTERN = /^[A-Z][A-Z0-9_]{0,39}$/;

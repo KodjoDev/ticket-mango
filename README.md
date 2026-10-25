@@ -53,12 +53,28 @@ Toutes les routes, sauf `/health`, `/auth/login` et `/auth/logout`, exigent une 
 | `GET` | `/auth/me` | Utilisateur courant |
 | `GET` | `/agents` | Agents assignables |
 | `GET` / `POST` / `PATCH` | `/users`, `/users/:id` | Gestion des comptes (administrateur) |
-| `GET` | `/tickets` | Liste paginée ; filtres `status`, `priority` (valeurs séparées par des virgules), `type`, `component`, `assigneeId`, `q`, `page`, `pageSize` |
+| `GET` | `/tickets` | Liste paginée ; filtres `status`, `priority` (valeurs séparées par des virgules), `type`, `component`, `assigneeId` (ou `none`), `tagId`, `q`, `page`, `pageSize` |
 | `POST` | `/tickets` | Création |
 | `GET` / `PATCH` | `/tickets/:id` | Détail, qualification, assignation, forçage de priorité (`priority: null` pour revenir à la matrice) |
 | `POST` | `/tickets/:id/status` | Changement de statut selon le workflow |
 | `GET` / `POST` | `/tickets/:id/comments` | Commentaires publics et notes internes (`isInternal`) |
 | `GET` | `/tickets/:id/audit` | Journal d'audit du ticket |
+| `GET` | `/config` | Listes, tags, matrice et mise en page pour l'interface |
+| `GET` | `/views` | Vues de la barre latérale avec leur nombre de tickets |
+| `POST` / `PATCH` / `PUT` / `DELETE` | `/admin/...` | Administration (options, matrice, mise en page, tags, vues) |
+
+### Administration
+
+Réservée au rôle Administrateur (`settings:manage`, `user:manage`), sous `/admin` dans l'interface :
+
+- **Utilisateurs** : création, rôle, désactivation, réinitialisation du mot de passe.
+- **Qualification** : types, modules et environnements. Une valeur utilisée s'archive au lieu d'être supprimée ; les types système (Bug, Question, Incident majeur) se renomment mais ne s'archivent pas.
+- **Matrice de priorité** : appliquée aux créations et requalifications suivantes.
+- **Tags** : catalogue (nom, couleur) appliqué par les agents.
+- **Mise en page** : ordre et visibilité des champs du ticket et des colonnes de la liste.
+- **Vues** : filtres enregistrés affichés dans la barre latérale avec leur nombre de tickets.
+
+Chaque action d'administration est inscrite au journal d'audit.
 
 ### Règles métier
 

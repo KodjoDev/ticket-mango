@@ -1,25 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  COMPONENT_LABELS,
-  COMPONENTS,
-  ENVIRONMENT_LABELS,
-  ENVIRONMENTS,
-  IMPACT_LABELS,
-  IMPACTS,
-  PRIORITIES,
-  PRIORITY_LABELS,
-  STATUS_LABELS,
-  STATUS_TRANSITIONS,
-  TICKET_TYPE_LABELS,
-  TICKET_TYPES,
-  URGENCIES,
-  URGENCY_LABELS,
-  type TicketStatus,
-} from '@ticketing/shared';
+import { PRIORITIES, PRIORITY_LABELS, STATUS_LABELS, STATUS_TRANSITIONS, type TicketStatus } from '@ticketing/shared';
 import { api, ApiError } from '../api/client';
 import type { Agent, Ticket, TicketInput } from '../api/types';
 import { useAuth, useCurrentUser } from '../auth/AuthContext';
-import { Avatar, ErrorMessage, Field, formatDate, options, PriorityBadge, StatusBadge } from './ui';
+import { QualificationFields } from './QualificationFields';
+import { Avatar, ErrorMessage, formatDate, options, PriorityBadge, StatusBadge } from './ui';
 
 /** Libellé du bouton selon la transition (réouverture, renvoi en arrière…). */
 function transitionLabel(from: TicketStatus, to: TicketStatus): string {
@@ -39,6 +24,7 @@ export function TicketSidebar({ ticket, agents }: { ticket: Ticket; agents: Agen
     queryClient.setQueryData(['ticket', ticket.id], updated);
     void queryClient.invalidateQueries({ queryKey: ['ticket', ticket.id, 'audit'] });
     void queryClient.invalidateQueries({ queryKey: ['tickets'] });
+    void queryClient.invalidateQueries({ queryKey: ['views'] });
   };
   // Conflit (modification concurrente) : on recharge la version à jour.
   const onError = (err: unknown) => {
@@ -86,41 +72,12 @@ export function TicketSidebar({ ticket, agents }: { ticket: Ticket; agents: Agen
       <section className="card">
         <h2>Qualification</h2>
         <ErrorMessage error={update.error} />
-        <fieldset disabled={!canQualify || busy}>
-          <Field label="Type">
-            <select value={ticket.type} onChange={(e) => update.mutate({ type: e.target.value as Ticket['type'] })}>
-              {options(TICKET_TYPES, TICKET_TYPE_LABELS)}
-            </select>
-          </Field>
-          <Field label="Module">
-            <select
-              value={ticket.component ?? ''}
-              onChange={(e) => update.mutate({ component: (e.target.value || null) as Ticket['component'] })}
-            >
-              <option value="">Non précisé</option>
-              {options(COMPONENTS, COMPONENT_LABELS)}
-            </select>
-          </Field>
-          <Field label="Environnement">
-            <select
-              value={ticket.environment ?? ''}
-              onChange={(e) => update.mutate({ environment: (e.target.value || null) as Ticket['environment'] })}
-            >
-              <option value="">Non précisé</option>
-              {options(ENVIRONMENTS, ENVIRONMENT_LABELS)}
-            </select>
-          </Field>
-          <Field label="Impact">
-            <select value={ticket.impact} onChange={(e) => update.mutate({ impact: e.target.value as Ticket['impact'] })}>
-              {options(IMPACTS, IMPACT_LABELS)}
-            </select>
-          </Field>
-          <Field label="Urgence">
-            <select value={ticket.urgency} onChange={(e) => update.mutate({ urgency: e.target.value as Ticket['urgency'] })}>
-              {options(URGENCIES, URGENCY_LABELS)}
-            </select>
-          </Field>
-        </fieldset>
+        <QualificationFields
+          values={{ ...ticket, tagIds: ticket.tags.map((t) => t.id) }}
+          onChange={(change) => update.mutate(change)}
+          disabled={!canQualify || busy}
+          supportFields={can('ticket:read:all')}
+        />
 
         <div className="field">
           <span className="field-label">Priorité</span>

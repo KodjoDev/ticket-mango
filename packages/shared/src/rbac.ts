@@ -19,6 +19,8 @@ export const PERMISSIONS = [
   'comment:internal',
   'audit:read',
   'user:manage',
+  /** Administrer la qualification, la matrice de priorité, les tags, la mise en page et les vues. */
+  'settings:manage',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 

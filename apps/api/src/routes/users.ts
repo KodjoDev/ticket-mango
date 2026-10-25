@@ -39,9 +39,13 @@ export const userRoutes: FastifyPluginAsync<{ prisma: PrismaClient }> = async (a
 
   app.post('/', async (request, reply) => {
     const { password, ...data } = createUserSchema.parse(request.body);
-    const user = await prisma.user.create({
-      data: { ...data, passwordHash: await hashPassword(password) },
-      select: userSelect,
+    const passwordHash = await hashPassword(password);
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({ data: { ...data, passwordHash }, select: userSelect });
+      await tx.auditLog.create({
+        data: { actorId: request.currentUser.id, action: 'user.created', changes: { userId: created.id, ...data } },
+      });
+      return created;
     });
     return reply.status(201).send(user);
   });
@@ -53,10 +57,22 @@ export const userRoutes: FastifyPluginAsync<{ prisma: PrismaClient }> = async (a
     if (id === request.currentUser.id && (data.isActive === false || (data.role && data.role !== 'ADMIN'))) {
       return reply.badRequest('Impossible de retirer ses propres droits administrateur');
     }
-    return prisma.user.update({
-      where: { id },
-      data: { ...data, ...(password && { passwordHash: await hashPassword(password) }) },
-      select: userSelect,
+    const passwordHash = password && (await hashPassword(password));
+    return prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id },
+        data: { ...data, ...(passwordHash && { passwordHash }) },
+        select: userSelect,
+      });
+      // Le mot de passe n'est jamais journalisé, seulement le fait qu'il a été réinitialisé.
+      await tx.auditLog.create({
+        data: {
+          actorId: request.currentUser.id,
+          action: 'user.updated',
+          changes: { userId: id, ...data, ...(password && { passwordReset: true }) },
+        },
+      });
+      return user;
     });
   });
 };

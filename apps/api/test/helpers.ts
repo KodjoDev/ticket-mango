@@ -29,10 +29,24 @@ export async function teardown({ app, prisma }: TestContext) {
   await prisma.$disconnect();
 }
 
+/** Valeurs de liste créées par la migration, dans leur ordre d'origine. */
+const DEFAULT_OPTIONS = {
+  TYPE: ['BUG', 'FEATURE_REQUEST', 'QUESTION', 'MAJOR_INCIDENT'],
+  COMPONENT: ['FRONTEND', 'API', 'DATABASE', 'BILLING', 'AUTH', 'OTHER'],
+  ENVIRONMENT: ['PRODUCTION', 'STAGING', 'ACCEPTANCE'],
+} as const;
+
 export async function resetDb(prisma: PrismaClient) {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE "AuditLog", "Comment", "Ticket", "User" RESTART IDENTITY CASCADE',
+    'TRUNCATE "AuditLog", "Comment", "TicketTag", "Tag", "Ticket", "User", "Setting", "View" RESTART IDENTITY CASCADE',
   );
+  // Les listes de qualification sont restaurées plutôt que vidées : la migration les initialise.
+  for (const [field, keys] of Object.entries(DEFAULT_OPTIONS) as [keyof typeof DEFAULT_OPTIONS, readonly string[]][]) {
+    await prisma.fieldOption.deleteMany({ where: { field, key: { notIn: [...keys] } } });
+    for (const [position, key] of keys.entries()) {
+      await prisma.fieldOption.update({ where: { field_key: { field, key } }, data: { position, isActive: true } });
+    }
+  }
 }
 
 let passwordHash: Promise<string> | undefined;
@@ -55,12 +69,14 @@ export async function login(app: FastifyInstance, email: string): Promise<string
 export async function actor(ctx: TestContext, role: Role) {
   const user = await createUser(ctx.prisma, role);
   const token = await login(ctx.app, user.email);
-  const request = (method: 'GET' | 'POST' | 'PATCH', url: string, payload?: object) =>
+  const request = (method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', url: string, payload?: object) =>
     ctx.app.inject({ method, url, payload, headers: { authorization: `Bearer ${token}` } });
   return {
     user,
     get: (url: string) => request('GET', url),
     post: (url: string, payload?: object) => request('POST', url, payload),
     patch: (url: string, payload?: object) => request('PATCH', url, payload),
+    put: (url: string, payload?: object) => request('PUT', url, payload),
+    del: (url: string) => request('DELETE', url),
   };
 }
