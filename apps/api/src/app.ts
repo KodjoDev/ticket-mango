@@ -6,10 +6,14 @@ import Fastify, { type FastifyServerOptions } from 'fastify';
 import type { Config } from './config';
 import { authPlugin } from './plugins/auth';
 import { registerErrorHandler } from './plugins/errors';
+import { adminRoutes } from './routes/admin';
 import { agentRoutes } from './routes/agents';
 import { authRoutes } from './routes/auth';
+import { configRoutes } from './routes/config';
 import { ticketRoutes } from './routes/tickets';
 import { userRoutes } from './routes/users';
+import { viewRoutes } from './routes/views';
+import { ConfigService } from './services/config';
 
 export interface AppDeps {
   config: Pick<Config, 'JWT_SECRET' | 'JWT_EXPIRES_IN' | 'LOGIN_RATE_LIMIT' | 'COOKIE_SECURE'>;
@@ -48,7 +52,11 @@ export async function buildApp({ config, prisma, logger = false }: AppDeps) {
   });
   await app.register(userRoutes, { prefix: '/users', prisma });
   await app.register(agentRoutes, { prefix: '/agents', prisma });
-  await app.register(ticketRoutes, { prefix: '/tickets', prisma });
+  const configService = new ConfigService(prisma);
+  await app.register(ticketRoutes, { prefix: '/tickets', prisma, config: configService });
+  await app.register(configRoutes, { prefix: '/config', prisma, config: configService });
+  await app.register(viewRoutes, { prefix: '/views', prisma, config: configService });
+  await app.register(adminRoutes, { prefix: '/admin', prisma, config: configService });
 
   return app;
 }

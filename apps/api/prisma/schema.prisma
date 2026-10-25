@@ -17,26 +17,11 @@ enum Role {
   EXTERNAL_USER
 }
 
-enum TicketType {
-  BUG
-  FEATURE_REQUEST
-  QUESTION
-  MAJOR_INCIDENT
-}
-
-enum Component {
-  FRONTEND
-  API
-  DATABASE
-  BILLING
-  AUTH
-  OTHER
-}
-
-enum Environment {
-  PRODUCTION
-  STAGING
-  ACCEPTANCE
+/// Listes de qualification administrables (CdC §3.1).
+enum OptionField {
+  TYPE
+  COMPONENT
+  ENVIRONMENT
 }
 
 enum Impact {
@@ -89,30 +74,32 @@ model User {
 
 model Ticket {
   /// Identifiant numérique lisible, utilisé dans les sujets d'email : [TICKET #12345].
-  id                 Int           @id @default(autoincrement())
+  id                 Int          @id @default(autoincrement())
   subject            String
   description        String
-  type               TicketType    @default(QUESTION)
-  component          Component?
-  environment        Environment?
-  impact             Impact        @default(INDIVIDUAL)
-  urgency            Urgency       @default(MEDIUM)
+  /// Clés de FieldOption (TYPE, COMPONENT, ENVIRONMENT), validées par l'API.
+  type               String       @default("QUESTION")
+  component          String?
+  environment        String?
+  impact             Impact       @default(INDIVIDUAL)
+  urgency            Urgency      @default(MEDIUM)
   priority           Priority
   /// Vrai lorsque la priorité a été forcée manuellement au lieu de suivre la matrice.
-  priorityOverridden Boolean       @default(false)
-  status             TicketStatus  @default(NEW)
-  requesterId        String        @db.Uuid
-  requester          User          @relation("requester", fields: [requesterId], references: [id])
-  assigneeId         String?       @db.Uuid
-  assignee           User?         @relation("assignee", fields: [assigneeId], references: [id])
+  priorityOverridden Boolean      @default(false)
+  status             TicketStatus @default(NEW)
+  requesterId        String       @db.Uuid
+  requester          User         @relation("requester", fields: [requesterId], references: [id])
+  assigneeId         String?      @db.Uuid
+  assignee           User?        @relation("assignee", fields: [assigneeId], references: [id])
   firstResponseAt    DateTime?
   resolvedAt         DateTime?
   closedAt           DateTime?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   comments  Comment[]
   auditLogs AuditLog[]
+  tags      TicketTag[]
 
   @@index([status])
   @@index([priority])
@@ -148,4 +135,58 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([ticketId, createdAt])
+}
+
+/// Valeur d'une liste de qualification. Jamais supprimée une fois utilisée : on l'archive.
+model FieldOption {
+  id        String      @id @default(uuid()) @db.Uuid
+  field     OptionField
+  /// Code stable stocké sur les tickets ; seul le libellé est modifiable.
+  key       String
+  label     String
+  position  Int
+  isActive  Boolean     @default(true)
+  /// Valeur dont dépend le comportement de l'application (ex. BUG, MAJOR_INCIDENT) : non archivable.
+  isSystem  Boolean     @default(false)
+  createdAt DateTime    @default(now())
+
+  @@unique([field, key])
+}
+
+model Tag {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  /// Couleur d'affichage au format #rrggbb.
+  color     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tickets TicketTag[]
+}
+
+model TicketTag {
+  ticketId Int
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  tagId    String @db.Uuid
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Restrict)
+
+  @@id([ticketId, tagId])
+  @@index([tagId])
+}
+
+/// Réglages globaux (matrice de priorité, mise en page…), un document JSON par clé.
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+/// Vue enregistrée de la barre latérale : un jeu de filtres nommé, partagé par le support.
+model View {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  filters   Json
+  position  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
