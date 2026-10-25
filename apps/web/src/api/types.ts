@@ -2,6 +2,7 @@ import type {
   Impact,
   LayoutItem,
   ListColumn,
+  MacroActions,
   OptionField,
   Priority,
   PriorityMatrix,
@@ -81,6 +82,59 @@ export interface AppConfig {
   priorityMatrix: PriorityMatrix;
   ticketForm: LayoutItem<TicketFormField>[];
   listColumns: LayoutItem<ListColumn>[];
+  features: { spellcheck: boolean; meetingProvider: string };
+}
+
+export type MeetingStatus = 'PROPOSED' | 'SCHEDULED' | 'CANCELLED';
+
+export interface Meeting {
+  id: string;
+  ticketId: number;
+  title: string;
+  durationMinutes: number;
+  status: MeetingStatus;
+  startsAt: string | null;
+  meetUrl: string | null;
+  provider: string;
+  bookingUrl: string | null;
+  slots: { id: string; startsAt: string }[];
+  organizer: { id: string; name: string };
+  participants: { id: string; name: string }[];
+  createdAt: string;
+}
+
+/** Vue publique d'une réservation (sans adresse email). */
+export interface Booking {
+  status: MeetingStatus;
+  title: string;
+  ticket: { id: number; subject: string };
+  organizer: string;
+  durationMinutes: number;
+  participants: string[];
+  slots: { id: string; startsAt: string }[];
+  startsAt: string | null;
+  meetUrl: string | null;
+  provider: string;
+}
+
+export interface Macro {
+  id: string;
+  systemKey: string | null;
+  name: string;
+  body: string;
+  isInternal: boolean;
+  actions: MacroActions;
+  position: number;
+  isActive: boolean;
+}
+
+export interface SpellcheckIssue {
+  offset: number;
+  length: number;
+  message: string;
+  category: string;
+  ruleId: string;
+  replacements: string[];
 }
 
 export interface View {

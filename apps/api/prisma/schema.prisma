@@ -14,7 +14,15 @@ enum Role {
   AGENT_N1
   AGENT_N2
   ADMIN
+  DEVELOPER
   EXTERNAL_USER
+}
+
+enum MeetingStatus {
+  /// Créneaux proposés, en attente du choix du demandeur.
+  PROPOSED
+  SCHEDULED
+  CANCELLED
 }
 
 /// Listes de qualification administrables (CdC §3.1).
@@ -66,10 +74,12 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  requestedTickets Ticket[]   @relation("requester")
-  assignedTickets  Ticket[]   @relation("assignee")
-  comments         Comment[]
-  auditLogs        AuditLog[]
+  requestedTickets  Ticket[]          @relation("requester")
+  assignedTickets   Ticket[]          @relation("assignee")
+  comments          Comment[]
+  auditLogs         AuditLog[]
+  organizedMeetings Meeting[]         @relation("organizer")
+  meetingInvites    MeetingAttendee[]
 }
 
 model Ticket {
@@ -100,6 +110,7 @@ model Ticket {
   comments  Comment[]
   auditLogs AuditLog[]
   tags      TicketTag[]
+  meetings  Meeting[]
 
   @@index([status])
   @@index([priority])
@@ -189,4 +200,65 @@ model View {
   position  Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// Rendez-vous visio planifié depuis un ticket (CdC : modèle Calendly).
+model Meeting {
+  id              String        @id @default(uuid()) @db.Uuid
+  ticketId        Int
+  ticket          Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  organizerId     String        @db.Uuid
+  organizer       User          @relation("organizer", fields: [organizerId], references: [id])
+  title           String
+  durationMinutes Int
+  status          MeetingStatus
+  startsAt        DateTime?
+  meetUrl         String?
+  /// Fournisseur ayant créé l'événement (demo, google) et identifiant chez lui.
+  provider        String
+  providerEventId String?
+  /// Jeton de la page publique de réservation (mode « proposer des créneaux »).
+  bookingToken    String?       @unique
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  slots     MeetingSlot[]
+  attendees MeetingAttendee[]
+
+  @@index([ticketId])
+}
+
+model MeetingSlot {
+  id        String   @id @default(uuid()) @db.Uuid
+  meetingId String   @db.Uuid
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  startsAt  DateTime
+
+  @@unique([meetingId, startsAt])
+}
+
+/// Participant invité en plus du demandeur et de l'organisateur (développeurs).
+model MeetingAttendee {
+  meetingId String  @db.Uuid
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId    String  @db.Uuid
+  user      User    @relation(fields: [userId], references: [id])
+
+  @@id([meetingId, userId])
+}
+
+/// Réponse type avec variables et actions sur le ticket.
+model Macro {
+  id         String   @id @default(uuid()) @db.Uuid
+  /// Identifiant des macros système (ex. meeting_scheduled) ; null pour les macros créées par l'administrateur.
+  systemKey  String?  @unique
+  name       String
+  body       String
+  isInternal Boolean  @default(false)
+  /// { status?, addTagIds?, assignToMe? }
+  actions    Json     @default("{}")
+  position   Int
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

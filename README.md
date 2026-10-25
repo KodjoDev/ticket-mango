@@ -61,6 +61,12 @@ Toutes les routes, sauf `/health`, `/auth/login` et `/auth/logout`, exigent une 
 | `GET` | `/tickets/:id/audit` | Journal d'audit du ticket |
 | `GET` | `/config` | Listes, tags, matrice et mise en page pour l'interface |
 | `GET` | `/views` | Vues de la barre latérale avec leur nombre de tickets |
+| `GET` / `POST` | `/tickets/:id/meetings` | Rendez-vous du ticket ; création en mode `direct` ou `proposal` |
+| `POST` | `/tickets/:id/meetings/:meetingId/cancel` | Annulation |
+| `GET` / `POST` | `/public/bookings/:token` | Page publique de réservation (sans session) |
+| `GET` | `/developers` | Développeurs invitables |
+| `GET` / `POST` | `/macros`, `/macros/:id/apply` | Macros actives ; application à un ticket |
+| `POST` | `/spellcheck` | Correction orthographique et grammaticale |
 | `POST` / `PATCH` / `PUT` / `DELETE` | `/admin/...` | Administration (options, matrice, mise en page, tags, vues) |
 
 ### Administration
@@ -75,6 +81,13 @@ Réservée au rôle Administrateur (`settings:manage`, `user:manage`), sous `/ad
 - **Vues** : filtres enregistrés affichés dans la barre latérale avec leur nombre de tickets.
 
 Chaque action d'administration est inscrite au journal d'audit.
+
+### Rendez-vous, macros et correcteur
+
+- **Rendez-vous** (agents) : depuis un ticket, fixer un créneau (le lien Meet est créé aussitôt) ou proposer 2 à 5 créneaux. Le demandeur choisit alors sur une page publique `/book/<jeton>`, sans connexion. Les développeurs (rôle Développeur) peuvent être invités. L'invitation est préparée dans la réponse grâce aux macros système « Invitation Meet » et « Proposition de créneaux ». Elle est publiée automatiquement quand le demandeur réserve.
+- **Visioconférence** : `MEETING_PROVIDER=demo` génère des liens fictifs (`meet.demo.invalid`) sans rien envoyer. Le fournisseur Google Calendar / Meet sera branché une fois le mode de connexion Google choisi (compte de service ou OAuth par agent).
+- **Macros** (administration) : un texte avec des variables (`{{demandeur.prenom}}`, `{{meet.lien}}`…), une réponse publique ou une note interne, et des actions (statut, tags, assignation). Les actions sont vérifiées avant tout envoi.
+- **Correcteur** : orthographe et grammaire par un serveur LanguageTool auto-hébergé (service `languagetool` du `docker-compose`, variable `LANGUAGETOOL_URL`). Les textes ne quittent pas votre infrastructure. Le correcteur du navigateur (français) reste actif dans tous les cas.
 
 ### Règles métier
 

@@ -1,6 +1,7 @@
 import type {
   LayoutItem,
   ListColumn,
+  MacroActions,
   OptionField,
   PriorityMatrix,
   Role,
@@ -12,10 +13,14 @@ import type {
   Agent,
   AppConfig,
   AuditEntry,
+  Booking,
   Comment,
   FieldOption,
+  Macro,
   ManagedUser,
+  Meeting,
   Page,
+  SpellcheckIssue,
   Tag,
   Ticket,
   TicketFilters,
@@ -54,7 +59,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    if (res.status === 401 && path !== '/auth/login') onUnauthorized();
+    // Un 401 sur la connexion ou sur le contrôle de session initial est attendu (pages publiques comprises).
+    if (res.status === 401 && path !== '/auth/login' && path !== '/auth/me') onUnauthorized();
     throw new ApiError(res.status, data?.message ?? `Erreur ${res.status}`, data?.issues);
   }
   return data as T;
@@ -92,6 +98,27 @@ export const api = {
 
   config: () => request<AppConfig>('GET', '/config'),
   views: () => request<View[]>('GET', '/views'),
+
+  meetings: (ticketId: number) => request<Meeting[]>('GET', `/tickets/${ticketId}/meetings`),
+  createMeeting: (
+    ticketId: number,
+    input: { mode: 'direct' | 'proposal'; title?: string; durationMinutes: number; slots: string[]; developerIds: string[] },
+  ) => request<Meeting>('POST', `/tickets/${ticketId}/meetings`, input),
+  cancelMeeting: (ticketId: number, meetingId: string) =>
+    request<Meeting>('POST', `/tickets/${ticketId}/meetings/${meetingId}/cancel`),
+  developers: () => request<{ id: string; name: string }[]>('GET', '/developers'),
+
+  macros: () => request<Macro[]>('GET', '/macros'),
+  applyMacro: (macroId: string, ticketId: number, body: string) =>
+    request<{ comment: Comment; ticket: Ticket }>('POST', `/macros/${macroId}/apply`, { ticketId, body }),
+
+  spellcheck: (text: string) => request<{ issues: SpellcheckIssue[] }>('POST', '/spellcheck', { text }),
+};
+
+/** Page publique de réservation : aucune session requise. */
+export const publicApi = {
+  booking: (token: string) => request<Booking>('GET', `/public/bookings/${token}`),
+  book: (token: string, slotId: string) => request<Booking>('POST', `/public/bookings/${token}`, { slotId }),
 };
 
 /** Routes d'administration (permissions user:manage et settings:manage). */
@@ -123,4 +150,12 @@ export const adminApi = {
     request<View>('PATCH', `/admin/views/${id}`, input),
   reorderViews: (ids: string[]) => request<View[]>('PUT', '/admin/views/order', { ids }),
   deleteView: (id: string) => request<void>('DELETE', `/admin/views/${id}`),
+
+  macros: () => request<Macro[]>('GET', '/admin/macros'),
+  createMacro: (input: { name: string; body: string; isInternal: boolean; actions: MacroActions }) =>
+    request<Macro>('POST', '/admin/macros', input),
+  updateMacro: (id: string, input: Partial<{ name: string; body: string; isInternal: boolean; actions: MacroActions; isActive: boolean }>) =>
+    request<Macro>('PATCH', `/admin/macros/${id}`, input),
+  reorderMacros: (ids: string[]) => request<Macro[]>('PUT', '/admin/macros/order', { ids }),
+  deleteMacro: (id: string) => request<void>('DELETE', `/admin/macros/${id}`),
 };

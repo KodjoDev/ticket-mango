@@ -3,9 +3,15 @@ import type { FastifyPluginAsync } from 'fastify';
 import type { ConfigService } from '../services/config';
 
 /** Configuration nécessaire à l'interface, chargée une fois à l'ouverture de session. */
-export const configRoutes: FastifyPluginAsync<{ prisma: PrismaClient; config: ConfigService }> = async (
+/** Fonctionnalités dépendant de la configuration du serveur. */
+export interface Features {
+  spellcheck: boolean;
+  meetingProvider: string;
+}
+
+export const configRoutes: FastifyPluginAsync<{ prisma: PrismaClient; config: ConfigService; features: Features }> = async (
   app,
-  { prisma, config },
+  { prisma, config, features },
 ) => {
   app.get('/', { preHandler: app.authenticate }, async () => {
     const [options, tags, priorityMatrix, ticketForm, listColumns] = await Promise.all([
@@ -15,6 +21,6 @@ export const configRoutes: FastifyPluginAsync<{ prisma: PrismaClient; config: Co
       config.ticketForm(),
       config.listColumns(),
     ]);
-    return { options, tags, priorityMatrix, ticketForm, listColumns };
+    return { options, tags, priorityMatrix, ticketForm, listColumns, features };
   });
 };

@@ -24,6 +24,14 @@ describe('RBAC', () => {
     expect(hasPermission('EXTERNAL_USER', 'ticket:transition')).toBe(false);
   });
 
+  it('cantonne le développeur à la lecture et aux notes internes', () => {
+    expect(hasPermission('DEVELOPER', 'ticket:read:all')).toBe(true);
+    expect(hasPermission('DEVELOPER', 'comment:internal')).toBe(true);
+    expect(hasPermission('DEVELOPER', 'comment:public')).toBe(false);
+    expect(hasPermission('DEVELOPER', 'ticket:transition')).toBe(false);
+    expect(hasPermission('DEVELOPER', 'meeting:create')).toBe(false);
+  });
+
   it('réserve l’administration à l’administrateur', () => {
     expect(hasPermission('AGENT_N2', 'user:manage')).toBe(false);
     expect(hasPermission('AGENT_N2', 'settings:manage')).toBe(false);

@@ -17,5 +17,14 @@ services:
       interval: 5s
       retries: 10
 
+  # Correcteur orthographique et grammatical : les textes restent sur votre infrastructure.
+  languagetool:
+    image: erikvl87/languagetool:6.6
+    ports:
+      - "8010:8010"
+    environment:
+      Java_Xms: 512m
+      Java_Xmx: 1g
+
 volumes:
   pgdata:
