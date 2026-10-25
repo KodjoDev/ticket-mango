@@ -36,10 +36,15 @@ const DEFAULT_OPTIONS = {
   ENVIRONMENT: ['PRODUCTION', 'STAGING', 'ACCEPTANCE'],
 } as const;
 
+const SEEDED_MACROS = ['Invitation Meet', 'Proposition de créneaux', "Demande d'informations complémentaires", 'Correctif livré'];
+
 export async function resetDb(prisma: PrismaClient) {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE "AuditLog", "Comment", "TicketTag", "Tag", "Ticket", "User", "Setting", "View" RESTART IDENTITY CASCADE',
+    'TRUNCATE "AuditLog", "Comment", "TicketTag", "Tag", "MeetingAttendee", "MeetingSlot", "Meeting", "Ticket", "User", "Setting", "View" RESTART IDENTITY CASCADE',
   );
+  // Macros : seules celles créées par la migration sont conservées.
+  await prisma.macro.deleteMany({ where: { name: { notIn: [...SEEDED_MACROS] } } });
+  await prisma.macro.updateMany({ data: { isActive: true } });
   // Les listes de qualification sont restaurées plutôt que vidées : la migration les initialise.
   for (const [field, keys] of Object.entries(DEFAULT_OPTIONS) as [keyof typeof DEFAULT_OPTIONS, readonly string[]][]) {
     await prisma.fieldOption.deleteMany({ where: { field, key: { notIn: [...keys] } } });

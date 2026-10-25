@@ -2,7 +2,7 @@
  * Gestion des droits (CdC §7.3).
  */
 
-export const ROLES = ['READER', 'AGENT_N1', 'AGENT_N2', 'ADMIN', 'EXTERNAL_USER'] as const;
+export const ROLES = ['READER', 'AGENT_N1', 'AGENT_N2', 'ADMIN', 'DEVELOPER', 'EXTERNAL_USER'] as const;
 export type Role = (typeof ROLES)[number];
 
 export const PERMISSIONS = [
@@ -16,9 +16,13 @@ export const PERMISSIONS = [
   'ticket:assign',
   'ticket:transition',
   'comment:create',
+  /** Écrire au demandeur ; sans cette permission, seules les notes internes sont possibles. */
+  'comment:public',
   'comment:internal',
   'audit:read',
   'user:manage',
+  /** Planifier un rendez-vous (Google Meet) depuis un ticket. */
+  'meeting:create',
   /** Administrer la qualification, la matrice de priorité, les tags, la mise en page et les vues. */
   'settings:manage',
 ] as const;
@@ -31,8 +35,10 @@ const AGENT_PERMISSIONS: Permission[] = [
   'ticket:assign',
   'ticket:transition',
   'comment:create',
+  'comment:public',
   'comment:internal',
   'audit:read',
+  'meeting:create',
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
@@ -40,7 +46,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   AGENT_N1: AGENT_PERMISSIONS,
   AGENT_N2: [...AGENT_PERMISSIONS, 'ticket:priority:override'],
   ADMIN: PERMISSIONS,
-  EXTERNAL_USER: ['ticket:create', 'comment:create'],
+  // Le développeur suit les tickets et échange avec le support en notes internes, sans qualifier.
+  DEVELOPER: ['ticket:read:all', 'comment:create', 'comment:internal', 'audit:read'],
+  EXTERNAL_USER: ['ticket:create', 'comment:create', 'comment:public'],
 };
 
 export function hasPermission(role: Role, permission: Permission): boolean {
@@ -52,5 +60,6 @@ export const ROLE_LABELS: Record<Role, string> = {
   AGENT_N1: 'Agent N1',
   AGENT_N2: 'Agent N2',
   ADMIN: 'Administrateur',
+  DEVELOPER: 'Développeur',
   EXTERNAL_USER: 'Utilisateur externe',
 };

@@ -321,7 +321,7 @@ export class TicketService {
 
   async addComment(user: CurrentUser, ticketId: number, body: string, isInternal: boolean) {
     ensure(user, 'comment:create');
-    if (isInternal) ensure(user, 'comment:internal');
+    ensure(user, isInternal ? 'comment:internal' : 'comment:public');
     const ticket = await this.findVisible(user, ticketId);
     if (ticket.status === 'CLOSED') throw conflict('Un ticket clôturé ne peut plus être commenté');
 

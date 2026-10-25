@@ -17,10 +17,12 @@ export function registerErrorHandler(app: FastifyInstance) {
       if (error.code === 'P2025') return reply.notFound('Ressource introuvable');
     }
     const statusCode = (error as FastifyError).statusCode ?? 500;
-    if (statusCode >= 500) {
+    // Une erreur imprévue (sans code) ne révèle rien ; un 502/503 volontaire garde son message.
+    if (statusCode === 500) {
       request.log.error({ err: error }, 'Erreur non gérée');
       return reply.status(500).send({ statusCode: 500, error: 'Internal Server Error', message: 'Erreur interne' });
     }
+    if (statusCode > 500) request.log.warn({ err: error }, 'Service dépendant indisponible');
     return reply.status(statusCode).send(error);
   });
 }
