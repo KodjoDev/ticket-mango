@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   PRIORITIES,
+  SLA_STATE_LABELS,
   STATUS_LABELS,
   TICKET_STATUSES,
   type Priority,
+  type SlaState,
   type TicketStatus,
   type ViewFilters,
 } from '@ticketing/shared';
@@ -26,6 +28,10 @@ export function describeFilters(f: ViewFilters, config: ConfigHelpers): string {
   if (f.assignee === 'me') parts.push("assignés à l'agent connecté");
   else if (f.assignee === 'none') parts.push('non assignés');
   if (f.tagId) parts.push(`tag ${config.tags.find((t) => t.id === f.tagId)?.name ?? '?'}`);
+  if (f.group === 'mine') parts.push("groupes de l'agent connecté");
+  else if (f.group) parts.push(`groupe ${config.groups.find((g) => g.id === f.group)?.name ?? '?'}`);
+  if (f.slaState) parts.push(`SLA ${f.slaState.map((s) => SLA_STATE_LABELS[s].toLowerCase()).join(' ou ')}`);
+  if (f.awaitingAgent) parts.push('réponse client en attente');
   return parts.join(' · ');
 }
 
@@ -44,6 +50,9 @@ function ViewForm({ view, onDone }: { view?: View; onDone: () => void }) {
   const [component, setComponent] = useState(initial.component ?? '');
   const [assignee, setAssignee] = useState(initial.assignee ?? '');
   const [tagId, setTagId] = useState(initial.tagId ?? '');
+  const [group, setGroup] = useState(initial.group ?? '');
+  const [sla, setSla] = useState(initial.slaState?.join(',') ?? '');
+  const [awaitingAgent, setAwaitingAgent] = useState(initial.awaitingAgent ?? false);
 
   const save = useAdminMutation((input: { name: string; filters: ViewFilters }) =>
     view ? adminApi.updateView(view.id, input) : adminApi.createView(input),
@@ -61,6 +70,9 @@ function ViewForm({ view, onDone }: { view?: View; onDone: () => void }) {
       ...(component && { component }),
       ...(assignee && { assignee }),
       ...(tagId && { tagId }),
+      ...(group && { group }),
+      ...(sla && { slaState: sla.split(',') as SlaState[] }),
+      ...(awaitingAgent && { awaitingAgent: true }),
     };
     save.mutate({ name: name.trim(), filters }, { onSuccess: onDone });
   }
@@ -128,6 +140,31 @@ function ViewForm({ view, onDone }: { view?: View; onDone: () => void }) {
           </label>
         ))}
       </fieldset>
+      <div className="grid-3">
+        <Field label="Groupe">
+          <select value={group} onChange={(e) => setGroup(e.target.value)}>
+            <option value="">Tous</option>
+            <option value="mine">Groupes de l'agent connecté</option>
+            {config.groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="SLA">
+          <select value={sla} onChange={(e) => setSla(e.target.value)}>
+            <option value="">Tous</option>
+            <option value="WARNING,BREACHED">À risque ou dépassés</option>
+            <option value="BREACHED">Dépassés</option>
+            <option value="PAUSED">En pause</option>
+          </select>
+        </Field>
+        <label className="checkbox macro-assign">
+          <input type="checkbox" checked={awaitingAgent} onChange={(e) => setAwaitingAgent(e.target.checked)} />
+          Réponse client en attente
+        </label>
+      </div>
       {config.tags.length > 0 && (
         <Field label="Tag">
           <select value={tagId} onChange={(e) => setTagId(e.target.value)}>

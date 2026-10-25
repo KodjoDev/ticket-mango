@@ -1,4 +1,4 @@
-import { isOpenStatus, TICKET_STATUSES, type Priority, type TicketStatus, type ViewFilters } from '@ticketing/shared';
+import { isOpenStatus, TICKET_STATUSES, type Priority, type SlaState, type TicketStatus, type ViewFilters } from '@ticketing/shared';
 import type { TicketFilters } from './api/types';
 
 export const PAGE_SIZE = 25;
@@ -21,6 +21,10 @@ export function filtersFromParams(params: URLSearchParams, userId: string): Tick
     component: params.get('component') || undefined,
     assigneeId: assignee === 'me' ? userId : assignee || undefined,
     tagId: params.get('tag') || undefined,
+    groupId: params.get('group') || undefined,
+    slaState: list(params.get('sla')) as SlaState[] | undefined,
+    awaitingAgent: params.get('awaiting') === '1' || undefined,
+    sort: params.get('sort') === 'sla' || params.has('sla') ? 'sla' : undefined,
     q: params.get('q') || undefined,
     page: Number(params.get('page')) || 1,
     pageSize: PAGE_SIZE,
@@ -36,6 +40,9 @@ export function viewToParams(f: ViewFilters): URLSearchParams {
   if (f.component) params.set('component', f.component);
   if (f.assignee) params.set('assignee', f.assignee);
   if (f.tagId) params.set('tag', f.tagId);
+  if (f.group) params.set('group', f.group);
+  if (f.slaState) params.set('sla', f.slaState.join(','));
+  if (f.awaitingAgent) params.set('awaiting', '1');
   return params;
 }
 

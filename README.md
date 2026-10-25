@@ -53,7 +53,7 @@ Toutes les routes, sauf `/health`, `/auth/login` et `/auth/logout`, exigent une 
 | `GET` | `/auth/me` | Utilisateur courant |
 | `GET` | `/agents` | Agents assignables |
 | `GET` / `POST` / `PATCH` | `/users`, `/users/:id` | Gestion des comptes (administrateur) |
-| `GET` | `/tickets` | Liste paginée ; filtres `status`, `priority` (valeurs séparées par des virgules), `type`, `component`, `assigneeId` (ou `none`), `tagId`, `q`, `page`, `pageSize` |
+| `GET` | `/tickets` | Liste paginée ; filtres `status`, `priority` (valeurs séparées par des virgules), `type`, `component`, `assigneeId` (ou `none`), `groupId` (ou `mine`), `slaState`, `awaitingAgent`, `tagId`, `q` (texte ou numéro), `sort` (`created`, `sla`), `page`, `pageSize` |
 | `POST` | `/tickets` | Création |
 | `GET` / `PATCH` | `/tickets/:id` | Détail, qualification, assignation, forçage de priorité (`priority: null` pour revenir à la matrice) |
 | `POST` | `/tickets/:id/status` | Changement de statut selon le workflow |
@@ -65,6 +65,10 @@ Toutes les routes, sauf `/health`, `/auth/login` et `/auth/logout`, exigent une 
 | `POST` | `/tickets/:id/meetings/:meetingId/cancel` | Annulation |
 | `GET` / `POST` | `/public/bookings/:token` | Page publique de réservation (sans session) |
 | `GET` | `/developers` | Développeurs invitables |
+| `POST` | `/tickets/:id/route` | Réapplique les règles de routage |
+| `PUT` | `/tickets/:id/parent` | Rattache à un ticket référent (`parentId`, ou `null` pour détacher) |
+| `GET` / `POST` | `/notifications`, `/notifications/:id/read`, `/notifications/read-all` | Notifications de l'utilisateur |
+| `…` | `/admin/groups`, `/admin/routing-rules`, `/admin/sla-policy` | Administration des groupes, du routage et des SLA |
 | `GET` / `POST` | `/macros`, `/macros/:id/apply` | Macros actives ; application à un ticket |
 | `POST` | `/spellcheck` | Correction orthographique et grammaticale |
 | `POST` / `PATCH` / `PUT` / `DELETE` | `/admin/...` | Administration (options, matrice, mise en page, tags, vues) |
@@ -88,6 +92,15 @@ Chaque action d'administration est inscrite au journal d'audit.
 - **Visioconférence** : `MEETING_PROVIDER=demo` génère des liens fictifs (`meet.demo.invalid`) sans rien envoyer. Le fournisseur Google Calendar / Meet sera branché une fois le mode de connexion Google choisi (compte de service ou OAuth par agent).
 - **Macros** (administration) : un texte avec des variables (`{{demandeur.prenom}}`, `{{meet.lien}}`…), une réponse publique ou une note interne, et des actions (statut, tags, assignation). Les actions sont vérifiées avant tout envoi.
 - **Correcteur** : orthographe et grammaire par un serveur LanguageTool auto-hébergé (service `languagetool` du `docker-compose`, variable `LANGUAGETOOL_URL`). Les textes ne quittent pas votre infrastructure. Le correcteur du navigateur (français) reste actif dans tous les cas.
+
+### Routage et SLA
+
+- **Groupes** (administration) : Support N1, Support N2, DevOps, Produit / QA par défaut. Chaque groupe a ses membres, un responsable et un mode de distribution : tour de rôle, par charge (moins de tickets ouverts), ou manuel (un dispatcher assigne).
+- **Règles de routage** : évaluées dans l'ordre à la création d'un ticket. La première qui correspond (type, module, environnement, priorité) désigne le groupe. Le bouton « Relancer le routage » les réapplique après une requalification.
+- **SLA** : délais de première réponse et de résolution par priorité. P0 et P1 sont décomptés en 24/7, les autres en heures ouvrées (lundi-vendredi 8h-18h, Europe/Paris, jours fériés français exclus). Tout se modifie dans l'administration. Le statut « En attente du client » et la résolution suspendent le délai de résolution ; quand le demandeur répond, le ticket revient en qualification.
+- **Alertes** : une tâche de surveillance (toutes les minutes, sous verrou PostgreSQL pour ne tourner que sur une instance) met à jour l'état SLA et notifie une seule fois, à risque puis dépassé, l'agent assigné et le responsable du groupe (ou les membres du groupe sans agent assigné).
+- **Ticket référent** : un ticket peut être rattaché à un ticket référent (un niveau, sans boucle). Le référent liste ses tickets liés.
+- **Réponse client en attente** : un ticket ouvert dont le demandeur s'est exprimé après la dernière réponse publique du support est surligné dans la liste et dispose d'un filtre et d'une vue.
 
 ### Règles métier
 

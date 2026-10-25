@@ -2,8 +2,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { AppRoutes, createQueryClient } from '../App';
-import { DEFAULT_LIST_COLUMNS, DEFAULT_PRIORITY_MATRIX, DEFAULT_TICKET_FORM } from '@ticketing/shared';
-import type { AppConfig, FieldOption, Ticket, User } from '../api/types';
+import { computeSla, DEFAULT_LIST_COLUMNS, DEFAULT_PRIORITY_MATRIX, DEFAULT_SLA_POLICY, DEFAULT_TICKET_FORM } from '@ticketing/shared';
+import type { AppConfig, FieldOption, SlaStatusDto, TicketDetail, User } from '../api/types';
 import { AuthProvider } from '../auth/AuthContext';
 
 type Handler = (body: unknown, url: URL) => { status?: number; json?: unknown };
@@ -35,6 +35,11 @@ export const testConfig: AppConfig = {
   priorityMatrix: DEFAULT_PRIORITY_MATRIX,
   ticketForm: DEFAULT_TICKET_FORM,
   listColumns: DEFAULT_LIST_COLUMNS,
+  slaPolicy: DEFAULT_SLA_POLICY,
+  groups: [
+    { id: 'g-n1', name: 'Support N1', isActive: true, memberIds: ['u-agent'] },
+    { id: 'g-n2', name: 'Support N2', isActive: true, memberIds: [] },
+  ],
   features: { spellcheck: true, meetingProvider: 'demo' },
 };
 
@@ -44,6 +49,7 @@ const DEFAULT_ROUTES: Record<string, object> = {
   'GET /views': [],
   'GET /macros': [],
   'GET /tickets/42/meetings': [],
+  'GET /notifications': { items: [], unread: 0 },
 };
 
 /**
@@ -84,7 +90,16 @@ export function renderApp(path: string) {
 export const agent: User = { id: 'u-agent', email: 'agent@test.local', name: 'Alice Agent', role: 'AGENT_N1' };
 export const external: User = { id: 'u-ext', email: 'client@test.local', name: 'Charles Client', role: 'EXTERNAL_USER' };
 
-export function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
+/** État SLA sérialisé comme le renvoie l'API (dates en chaînes). */
+export function slaDto(createdAt: string, now = createdAt): SlaStatusDto {
+  return JSON.parse(
+    JSON.stringify(
+      computeSla({ priority: 'P2', createdAt: new Date(createdAt), firstResponseAt: null, resolvedAt: null, pauses: [], now: new Date(now) }),
+    ),
+  );
+}
+
+export function makeTicket(overrides: Partial<TicketDetail> = {}): TicketDetail {
   return {
     id: 42,
     subject: 'Erreur 500 au login',
@@ -99,7 +114,17 @@ export function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     status: 'NEW',
     requester: { id: external.id, name: external.name, email: external.email },
     assignee: null,
+    group: { id: 'g-n1', name: 'Support N1' },
     tags: [],
+    sla: slaDto('2026-10-20T08:00:00.000Z'),
+    slaState: 'OK',
+    slaDueAt: null,
+    parent: null,
+    childCount: 0,
+    children: [],
+    awaitingAgent: false,
+    lastRequesterReplyAt: null,
+    lastAgentReplyAt: null,
     firstResponseAt: null,
     resolvedAt: null,
     closedAt: null,
