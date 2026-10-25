@@ -9,6 +9,7 @@ export const ADMIN_SECTIONS: { path: string; label: string; permission: Permissi
   { path: 'tags', label: 'Tags', permission: 'settings:manage' },
   { path: 'layout', label: 'Mise en page', permission: 'settings:manage' },
   { path: 'views', label: 'Vues', permission: 'settings:manage' },
+  { path: 'macros', label: 'Macros', permission: 'settings:manage' },
 ];
 
 export function AdminLayout() {

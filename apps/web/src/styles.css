@@ -1124,6 +1124,277 @@ table.matrix {
   color: #ad5918;
 }
 
+/* Zone de réponse : macros et correcteur */
+
+.macro-select {
+  width: auto;
+  margin: 6px 8px 6px auto;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.macro-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--hover);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.macro-banner button.link {
+  margin-left: auto;
+  font-size: 13px;
+}
+
+.composer-footer {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.spellcheck {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.spellcheck .alert {
+  margin: 8px 0 0;
+}
+
+.spellcheck-result ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spellcheck-result li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--st-new);
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+.spellcheck-ok {
+  margin: 8px 0 0;
+  color: var(--st-ready);
+  font-weight: 600;
+}
+
+.spellcheck-category {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.spellcheck-excerpt mark {
+  background: #ffe2b8;
+  border-bottom: 2px solid #f79a3e;
+  color: inherit;
+  padding: 0 1px;
+}
+
+.spellcheck-fixes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.spellcheck-fixes button {
+  padding: 2px 10px;
+  font-size: 13px;
+}
+
+/* Rendez-vous */
+
+.meeting-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.meeting-form .segmented {
+  margin-bottom: 4px;
+}
+
+.slot-row {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+
+.slot-row .field {
+  flex: 1;
+}
+
+.slot-row button.link {
+  margin-bottom: 20px;
+}
+
+.meeting-form > button.link {
+  align-self: flex-start;
+  margin-bottom: 12px;
+}
+
+.developer-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-bottom: 12px;
+}
+
+.developer-picker legend {
+  margin-bottom: 6px;
+}
+
+.meetings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meeting {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--st-pending);
+  border-radius: var(--radius);
+}
+
+.meeting-proposed {
+  border-left-color: var(--st-new);
+}
+
+.meeting-cancelled {
+  border-left-color: var(--st-solved);
+  opacity: 0.7;
+}
+
+.meeting-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.demo-badge {
+  margin-left: 8px;
+  background: var(--st-new);
+  color: #3d2a00;
+}
+
+/* Page publique de réservation */
+
+.booking-card {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+}
+
+.booking-card h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.booking-card p {
+  margin: 0;
+}
+
+.slot-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.slot-choice {
+  text-align: left;
+  font-weight: 500;
+}
+
+.slot-choice.selected {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.booking-confirmed {
+  padding: 14px;
+  border-radius: var(--radius);
+  background: #edf8f4;
+  border: 1px solid #aecfc2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Administration des macros */
+
+.macro-editor {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.macro-preview {
+  margin-top: 4px;
+  padding: 12px;
+  min-height: 220px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.macro-preview.internal {
+  background: var(--internal-bg);
+  border-color: var(--internal-border);
+}
+
+.variables {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+button.variable {
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 10px;
+}
+
+.macro-assign {
+  align-self: center;
+  margin-top: 12px;
+}
+
 /* Petits écrans */
 
 @media (max-width: 900px) {
@@ -1155,6 +1426,7 @@ table.matrix {
   .filters,
   .grid-3,
   .grid-4,
+  .macro-editor,
   .add-row,
   .ticket-layout {
     grid-template-columns: 1fr;

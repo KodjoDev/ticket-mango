@@ -5,11 +5,13 @@ import { AuthProvider } from './auth/AuthContext';
 import { Layout } from './components/Layout';
 import { AdminIndex, AdminLayout, RequirePermission } from './pages/admin/AdminLayout';
 import { LayoutAdmin } from './pages/admin/LayoutAdmin';
+import { MacrosAdmin } from './pages/admin/MacrosAdmin';
 import { PriorityAdmin } from './pages/admin/PriorityAdmin';
 import { QualificationAdmin } from './pages/admin/QualificationAdmin';
 import { TagsAdmin } from './pages/admin/TagsAdmin';
 import { UsersAdmin } from './pages/admin/UsersAdmin';
 import { ViewsAdmin } from './pages/admin/ViewsAdmin';
+import { BookingPage } from './pages/BookingPage';
 import { LoginPage } from './pages/LoginPage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
 import { TicketListPage } from './pages/TicketListPage';
@@ -31,6 +33,7 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/book/:token" element={<BookingPage />} />
       <Route element={<Layout />}>
         <Route path="/tickets" element={<TicketListPage />} />
         <Route path="/tickets/new" element={<TicketNewPage />} />
@@ -43,6 +46,7 @@ export function AppRoutes() {
           <Route path="tags" element={<RequirePermission permission="settings:manage"><TagsAdmin /></RequirePermission>} />
           <Route path="layout" element={<RequirePermission permission="settings:manage"><LayoutAdmin /></RequirePermission>} />
           <Route path="views" element={<RequirePermission permission="settings:manage"><ViewsAdmin /></RequirePermission>} />
+          <Route path="macros" element={<RequirePermission permission="settings:manage"><MacrosAdmin /></RequirePermission>} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/tickets" replace />} />

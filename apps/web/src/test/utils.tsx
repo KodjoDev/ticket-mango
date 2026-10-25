@@ -35,12 +35,15 @@ export const testConfig: AppConfig = {
   priorityMatrix: DEFAULT_PRIORITY_MATRIX,
   ticketForm: DEFAULT_TICKET_FORM,
   listColumns: DEFAULT_LIST_COLUMNS,
+  features: { spellcheck: true, meetingProvider: 'demo' },
 };
 
 /** Réponses communes à toutes les pages authentifiées ; chaque test peut les surcharger. */
 const DEFAULT_ROUTES: Record<string, object> = {
   'GET /config': testConfig,
   'GET /views': [],
+  'GET /macros': [],
+  'GET /tickets/42/meetings': [],
 };
 
 /**
