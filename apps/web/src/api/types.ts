@@ -7,6 +7,10 @@ import type {
   Priority,
   PriorityMatrix,
   Role,
+  SlaCalendar,
+  SlaMetricState,
+  SlaPolicy,
+  SlaState,
   TicketFormField,
   TicketStatus,
   Urgency,
@@ -48,12 +52,91 @@ export interface Ticket {
   status: TicketStatus;
   requester: { id: string; name: string; email: string };
   assignee: { id: string; name: string } | null;
+  group: { id: string; name: string } | null;
   tags: TagRef[];
+  sla: SlaStatusDto;
+  slaState: SlaState;
+  slaDueAt: string | null;
+  parent: { id: number; subject: string; status: TicketStatus } | null;
+  childCount: number;
+  /** Le demandeur s'est exprimé après la dernière réponse publique du support. */
+  awaitingAgent: boolean;
+  lastRequesterReplyAt: string | null;
+  lastAgentReplyAt: string | null;
   firstResponseAt: string | null;
   resolvedAt: string | null;
   closedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SlaMetricDto {
+  state: SlaMetricState;
+  targetMinutes: number;
+  elapsedMinutes: number;
+  remainingMinutes: number;
+  dueAt: string | null;
+}
+
+export interface SlaStatusDto {
+  calendar: SlaCalendar;
+  firstResponse: SlaMetricDto;
+  resolution: SlaMetricDto;
+  state: SlaState;
+  dueAt: string | null;
+}
+
+/** Détail d'un ticket : avec les tickets rattachés s'il est référent. */
+export interface TicketDetail extends Ticket {
+  children: { id: number; subject: string; status: TicketStatus; priority: Priority; requester: { id: string; name: string } }[];
+}
+
+export interface Notification {
+  id: string;
+  ticketId: number | null;
+  kind: string;
+  message: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface GroupRef {
+  id: string;
+  name: string;
+  isActive: boolean;
+  memberIds: string[];
+}
+
+export type Distribution = 'ROUND_ROBIN' | 'LOAD' | 'MANUAL';
+
+export interface AdminGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  distribution: Distribution;
+  managerId: string | null;
+  manager: { id: string; name: string } | null;
+  isActive: boolean;
+  position: number;
+  members: { id: string; name: string; role: Role; isActive: boolean }[];
+  ticketCount: number;
+}
+
+export interface RuleConditions {
+  type?: string[];
+  component?: string[];
+  environment?: string[];
+  priority?: Priority[];
+}
+
+export interface RoutingRule {
+  id: string;
+  name: string;
+  conditions: RuleConditions;
+  groupId: string;
+  group: { id: string; name: string };
+  position: number;
+  isActive: boolean;
 }
 
 export interface TagRef {
@@ -82,6 +165,8 @@ export interface AppConfig {
   priorityMatrix: PriorityMatrix;
   ticketForm: LayoutItem<TicketFormField>[];
   listColumns: LayoutItem<ListColumn>[];
+  slaPolicy: SlaPolicy;
+  groups: GroupRef[];
   features: { spellcheck: boolean; meetingProvider: string };
 }
 
@@ -175,6 +260,10 @@ export interface TicketFilters {
   component?: string;
   /** Identifiant d'agent ou « none » (non assigné). */
   assigneeId?: string;
+  groupId?: string;
+  slaState?: SlaState[];
+  awaitingAgent?: boolean;
+  sort?: 'created' | 'sla';
   tagId?: string;
   q?: string;
   page?: number;
@@ -191,5 +280,6 @@ export type TicketInput = Partial<{
   urgency: Urgency;
   priority: Priority | null;
   assigneeId: string | null;
+  groupId: string | null;
   tagIds: string[];
 }>;

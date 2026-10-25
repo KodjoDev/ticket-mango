@@ -1,10 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PRIORITIES, PRIORITY_LABELS, STATUS_LABELS, STATUS_TRANSITIONS, type TicketStatus } from '@ticketing/shared';
 import { api, ApiError } from '../api/client';
-import type { Agent, Ticket, TicketInput } from '../api/types';
+import type { Agent, Ticket, TicketDetail, TicketInput } from '../api/types';
 import { useAuth, useCurrentUser } from '../auth/AuthContext';
+import { useConfig } from '../config/ConfigContext';
 import { QualificationFields } from './QualificationFields';
-import { Avatar, ErrorMessage, formatDate, options, PriorityBadge, StatusBadge } from './ui';
+import { ReferentCard } from './Referent';
+import { SlaCard } from './Sla';
+import { Avatar, ErrorMessage, Field, formatDate, options, PriorityBadge, StatusBadge } from './ui';
 
 /** Libellé du bouton selon la transition (réouverture, renvoi en arrière…). */
 function transitionLabel(from: TicketStatus, to: TicketStatus): string {
@@ -14,14 +17,16 @@ function transitionLabel(from: TicketStatus, to: TicketStatus): string {
   return STATUS_LABELS[to];
 }
 
-export function TicketSidebar({ ticket, agents }: { ticket: Ticket; agents: Agent[] }) {
+export function TicketSidebar({ ticket, agents }: { ticket: TicketDetail; agents: Agent[] }) {
   const { can } = useAuth();
+  const config = useConfig();
   const user = useCurrentUser();
   const queryClient = useQueryClient();
   const closed = ticket.status === 'CLOSED';
 
   const onSuccess = (updated: Ticket) => {
-    queryClient.setQueryData(['ticket', ticket.id], updated);
+    // Fusion : la réponse ne contient pas la liste des tickets rattachés du détail.
+    queryClient.setQueryData<TicketDetail>(['ticket', ticket.id], (old) => (old ? { ...old, ...updated } : old));
     void queryClient.invalidateQueries({ queryKey: ['ticket', ticket.id, 'audit'] });
     void queryClient.invalidateQueries({ queryKey: ['tickets'] });
     void queryClient.invalidateQueries({ queryKey: ['views'] });
@@ -35,11 +40,15 @@ export function TicketSidebar({ ticket, agents }: { ticket: Ticket; agents: Agen
 
   const update = useMutation({ mutationFn: (input: TicketInput) => api.updateTicket(ticket.id, input), onSuccess, onError });
   const transition = useMutation({ mutationFn: (to: TicketStatus) => api.transition(ticket.id, to), onSuccess, onError });
+  const route = useMutation({ mutationFn: () => api.route(ticket.id), onSuccess, onError });
 
   const canQualify = can('ticket:qualify') && !closed;
   const canAssign = can('ticket:assign') && !closed;
   const nextStatuses = can('ticket:transition') ? STATUS_TRANSITIONS[ticket.status] : [];
-  const busy = update.isPending || transition.isPending;
+  const busy = update.isPending || transition.isPending || route.isPending;
+  // Membres du groupe du ticket proposés en premier dans la liste d'assignation.
+  const groupMembers = new Set(config.groups.find((g) => g.id === ticket.group?.id)?.memberIds ?? []);
+  const sortedAgents = [...agents].sort((a, b) => Number(groupMembers.has(b.id)) - Number(groupMembers.has(a.id)));
 
   return (
     <aside className="ticket-side">
@@ -53,6 +62,8 @@ export function TicketSidebar({ ticket, agents }: { ticket: Ticket; agents: Agen
           </div>
         </div>
       </section>
+
+      {can('ticket:read:all') && ticket.status !== 'CLOSED' && <SlaCard sla={ticket.sla} />}
 
       <section className="card">
         <h2>Statut</h2>
@@ -101,31 +112,62 @@ export function TicketSidebar({ ticket, agents }: { ticket: Ticket; agents: Agen
 
       <section className="card">
         <h2>Assignation</h2>
+        <ErrorMessage error={route.error} />
         {canAssign ? (
           <>
-            <select
-              aria-label="Agent assigné"
-              disabled={busy}
-              value={ticket.assignee?.id ?? ''}
-              onChange={(e) => update.mutate({ assigneeId: e.target.value || null })}
-            >
-              <option value="">Non assigné</option>
-              {agents.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-            {ticket.assignee?.id !== user.id && can('ticket:transition') && (
-              <button type="button" className="link" disabled={busy} onClick={() => update.mutate({ assigneeId: user.id })}>
-                M'assigner ce ticket
+            <Field label="Groupe">
+              <select
+                aria-label="Groupe"
+                disabled={busy}
+                value={ticket.group?.id ?? ''}
+                onChange={(e) => update.mutate({ groupId: e.target.value || null })}
+              >
+                <option value="">Aucun groupe</option>
+                {config.groups
+                  .filter((g) => g.isActive || g.id === ticket.group?.id)
+                  .map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            <Field label="Agent">
+              <select
+                aria-label="Agent assigné"
+                disabled={busy}
+                value={ticket.assignee?.id ?? ''}
+                onChange={(e) => update.mutate({ assigneeId: e.target.value || null })}
+              >
+                <option value="">Non assigné</option>
+                {sortedAgents.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                    {groupMembers.has(a.id) ? ' (groupe)' : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="link-row">
+              {ticket.assignee?.id !== user.id && can('ticket:transition') && (
+                <button type="button" className="link" disabled={busy} onClick={() => update.mutate({ assigneeId: user.id })}>
+                  M'assigner ce ticket
+                </button>
+              )}
+              <button type="button" className="link" disabled={busy} onClick={() => route.mutate()}>
+                Relancer le routage
               </button>
-            )}
+            </div>
           </>
         ) : (
-          <p>{ticket.assignee?.name ?? <span className="muted">Non assigné</span>}</p>
+          <p>
+            {ticket.group && <span className="muted">{ticket.group.name} · </span>}
+            {ticket.assignee?.name ?? <span className="muted">Non assigné</span>}
+          </p>
         )}
       </section>
+
+      <ReferentCard ticket={ticket} />
 
       <section className="card">
         <h2>Dates</h2>

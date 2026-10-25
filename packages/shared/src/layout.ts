@@ -2,6 +2,7 @@
  * Mise en page administrable : champs du ticket, colonnes de la liste et vues.
  */
 import type { Priority } from './priority';
+import type { SlaState } from './sla';
 import type { TicketStatus } from './workflow';
 
 export const TICKET_FORM_FIELDS = ['type', 'component', 'environment', 'impact', 'urgency', 'tags'] as const;
@@ -21,11 +22,13 @@ export const LIST_COLUMNS = [
   'subject',
   'priority',
   'status',
+  'sla',
   'type',
   'component',
   'environment',
   'tags',
   'requester',
+  'group',
   'assignee',
   'createdAt',
   'updatedAt',
@@ -37,11 +40,13 @@ export const LIST_COLUMN_LABELS: Record<ListColumn, string> = {
   subject: 'Sujet',
   priority: 'Priorité',
   status: 'Statut',
+  sla: 'SLA',
   type: 'Type',
   component: 'Module',
   environment: 'Environnement',
   tags: 'Tags',
   requester: 'Demandeur',
+  group: 'Groupe',
   assignee: 'Assigné',
   createdAt: 'Créé le',
   updatedAt: 'Mis à jour le',
@@ -83,5 +88,10 @@ export interface ViewFilters {
   type?: string;
   component?: string;
   assignee?: 'me' | 'none' | string;
+  /** « mine » : les groupes de l'agent connecté. */
+  group?: 'mine' | string;
+  slaState?: SlaState[];
   tagId?: string;
+  /** Le demandeur attend une réponse du support. */
+  awaitingAgent?: boolean;
 }

@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { ConfigProvider } from '../config/ConfigContext';
 import { isViewActive, viewToParams } from '../filters';
+import { NotificationBell } from './Notifications';
 import { Avatar, Spinner } from './ui';
 
 function ViewsNav() {
@@ -56,6 +57,7 @@ export function Layout() {
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">M</span>
           Ticket Mango
+          {can('ticket:read:all') && <NotificationBell />}
         </div>
         <nav aria-label="Navigation principale">
           {can('ticket:read:all') ? <ViewsNav /> : <NavLink to="/tickets">Mes demandes</NavLink>}

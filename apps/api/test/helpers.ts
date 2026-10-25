@@ -36,12 +36,36 @@ const DEFAULT_OPTIONS = {
   ENVIRONMENT: ['PRODUCTION', 'STAGING', 'ACCEPTANCE'],
 } as const;
 
+export const GROUP_IDS = {
+  n1: '00000000-0000-4000-8000-000000000001',
+  n2: '00000000-0000-4000-8000-000000000002',
+  devops: '00000000-0000-4000-8000-000000000003',
+  product: '00000000-0000-4000-8000-000000000004',
+} as const;
+
+const DEFAULT_GROUPS = [
+  { id: GROUP_IDS.n1, name: 'Support N1', distribution: 'ROUND_ROBIN' as const },
+  { id: GROUP_IDS.n2, name: 'Support N2', distribution: 'LOAD' as const },
+  { id: GROUP_IDS.devops, name: 'DevOps', distribution: 'MANUAL' as const },
+  { id: GROUP_IDS.product, name: 'Produit / QA', distribution: 'MANUAL' as const },
+];
+
+const DEFAULT_RULES = [
+  { name: 'Incidents critiques', conditions: { priority: ['P0', 'P1'] }, groupId: GROUP_IDS.n2 },
+  { name: 'Évolutions', conditions: { type: ['FEATURE_REQUEST'] }, groupId: GROUP_IDS.product },
+  { name: 'Base de données', conditions: { component: ['DATABASE'] }, groupId: GROUP_IDS.devops },
+  { name: 'Par défaut', conditions: {}, groupId: GROUP_IDS.n1 },
+];
+
 const SEEDED_MACROS = ['Invitation Meet', 'Proposition de créneaux', "Demande d'informations complémentaires", 'Correctif livré'];
 
 export async function resetDb(prisma: PrismaClient) {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE "AuditLog", "Comment", "TicketTag", "Tag", "MeetingAttendee", "MeetingSlot", "Meeting", "Ticket", "User", "Setting", "View" RESTART IDENTITY CASCADE',
+    'TRUNCATE "AuditLog", "Comment", "TicketTag", "Tag", "MeetingAttendee", "MeetingSlot", "Meeting", "Notification", "SlaAlert", "SlaPause", "GroupMember", "RoutingRule", "Group", "Ticket", "User", "Setting", "View" RESTART IDENTITY CASCADE',
   );
+  // Groupes et règles de routage tels que créés par la migration.
+  await prisma.group.createMany({ data: DEFAULT_GROUPS.map((g, position) => ({ ...g, position })) });
+  await prisma.routingRule.createMany({ data: DEFAULT_RULES.map((r, position) => ({ ...r, position })) });
   // Macros : seules celles créées par la migration sont conservées.
   await prisma.macro.deleteMany({ where: { name: { notIn: [...SEEDED_MACROS] } } });
   await prisma.macro.updateMany({ data: { isActive: true } });

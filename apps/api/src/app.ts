@@ -21,7 +21,20 @@ import { DemoMeetingProvider, type MeetingProvider } from './services/meetings/p
 import { MeetingService } from './services/meetings/service';
 import { LanguageToolClient } from './services/spellcheck';
 import { spellcheckRoutes } from './routes/spellcheck';
+import { NotificationService } from './services/notifications';
+import { RoutingService } from './services/routing';
+import { SlaService } from './services/sla';
+import { SlaMonitor } from './services/sla-monitor';
 import { TicketService } from './services/tickets';
+import { notificationRoutes } from './routes/notifications';
+import { routingAdminRoutes } from './routes/routing-admin';
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    /** Surveillance des SLA : démarrée par le serveur, appelée directement par les tests. */
+    slaMonitor: SlaMonitor;
+  }
+}
 
 export interface AppDeps {
   config: Pick<Config, 'JWT_SECRET' | 'JWT_EXPIRES_IN' | 'LOGIN_RATE_LIMIT' | 'COOKIE_SECURE'> &
@@ -72,17 +85,24 @@ export async function buildApp({
   await app.register(userRoutes, { prefix: '/users', prisma });
   await app.register(agentRoutes, { prefix: '/agents', prisma });
   const configService = new ConfigService(prisma);
-  await app.register(ticketRoutes, { prefix: '/tickets', prisma, config: configService });
+
   await app.register(configRoutes, {
     prefix: '/config',
     prisma,
     config: configService,
     features: { spellcheck: spellchecker !== null, meetingProvider: meetingProvider.name },
   });
-  await app.register(viewRoutes, { prefix: '/views', prisma, config: configService });
+
   await app.register(adminRoutes, { prefix: '/admin', prisma, config: configService });
 
-  const tickets = new TicketService(prisma, configService);
+  const notifications = new NotificationService(prisma);
+  const sla = new SlaService(prisma, configService);
+  const tickets = new TicketService({ prisma, config: configService, sla, routing: new RoutingService(prisma), notifications });
+  await app.register(ticketRoutes, { prefix: '/tickets', tickets });
+  await app.register(viewRoutes, { prefix: '/views', prisma, tickets });
+  await app.register(notificationRoutes, { prefix: '/notifications', notifications });
+  await app.register(routingAdminRoutes, { prefix: '/admin', prisma, config: configService });
+  app.decorate('slaMonitor', new SlaMonitor(prisma, sla, notifications));
   const macros = new MacroService(prisma, configService, tickets);
   const meetings = new MeetingService({
     prisma,

@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
+  isOpenStatus,
   LIST_COLUMN_LABELS,
   PRIORITIES,
   PRIORITY_LABELS,
@@ -12,6 +13,7 @@ import { Link, useSearchParams } from 'react-router';
 import { api } from '../api/client';
 import type { Ticket } from '../api/types';
 import { useAuth, useCurrentUser } from '../auth/AuthContext';
+import { SlaBadge } from '../components/Sla';
 import { TagList } from '../components/tags';
 import { Avatar, ErrorMessage, formatDate, PriorityBadge, Spinner, StatusBadge } from '../components/ui';
 import { useConfig, type ConfigHelpers } from '../config/ConfigContext';
@@ -20,7 +22,14 @@ import { filtersFromParams, PAGE_SIZE } from '../filters';
 /** Contenu d'une cellule pour chaque colonne configurable. */
 const CELLS: Record<ListColumn, (t: Ticket, config: ConfigHelpers) => ReactNode> = {
   id: (t) => <span className="muted">{t.id}</span>,
-  subject: (t) => <Link to={`/tickets/${t.id}`}>{t.subject}</Link>,
+  subject: (t) => (
+    <>
+      <Link to={`/tickets/${t.id}`}>{t.subject}</Link>
+      <TicketMarkers ticket={t} />
+    </>
+  ),
+  sla: (t) => (isOpenStatus(t.status) ? <SlaBadge sla={t.sla} /> : <span className="muted">—</span>),
+  group: (t) => t.group?.name ?? <span className="muted">—</span>,
   priority: (t) => <PriorityBadge priority={t.priority} />,
   status: (t) => <StatusBadge status={t.status} />,
   type: (t, c) => c.label('TYPE', t.type),
@@ -41,6 +50,23 @@ const CELLS: Record<ListColumn, (t: Ticket, config: ConfigHelpers) => ReactNode>
   updatedAt: (t) => <span className="nowrap">{formatDate(t.updatedAt)}</span>,
 };
 
+/** Repères sous le sujet : réponse client en attente, ticket référent ou rattaché. */
+export function TicketMarkers({ ticket }: { ticket: Ticket }) {
+  const awaiting = ticket.awaitingAgent && isOpenStatus(ticket.status);
+  if (!awaiting && !ticket.childCount && !ticket.parent) return null;
+  return (
+    <div className="markers">
+      {awaiting && (
+        <span className="badge awaiting-badge" title={`Dernier message du demandeur : ${formatDate(ticket.lastRequesterReplyAt)}`}>
+          Réponse client en attente
+        </span>
+      )}
+      {ticket.childCount > 0 && <span className="badge referent-badge">Référent · {ticket.childCount} lié(s)</span>}
+      {ticket.parent && <span className="muted small">↳ rattaché au #{ticket.parent.id}</span>}
+    </div>
+  );
+}
+
 /** Valeur d'un sélecteur dont l'URL peut contenir plusieurs valeurs (ex. vue « P0 / P1 »). */
 function single(value: string | null): string {
   return value && !value.includes(',') ? value : value ? '__multi' : '';
@@ -59,6 +85,8 @@ export function TicketListPage() {
     queryKey: ['tickets', filters],
     queryFn: () => api.tickets(filters),
     placeholderData: keepPreviousData,
+    // Les états SLA évoluent avec le temps : la liste se rafraîchit d'elle-même.
+    refetchInterval: 60_000,
   });
 
   function setParam(key: string, value: string | null) {
@@ -158,6 +186,35 @@ export function TicketListPage() {
             ))}
           </select>
         )}
+        {can('ticket:read:all') && config.groups.length > 0 && (
+          <select aria-label="Groupe" value={params.get('group') ?? ''} onChange={(e) => setParam('group', e.target.value)}>
+            <option value="">Tous groupes</option>
+            <option value="mine">Mes groupes</option>
+            {config.groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        )}
+        {can('ticket:read:all') && (
+          <select aria-label="SLA" value={params.get('sla') ?? ''} onChange={(e) => setParam('sla', e.target.value)}>
+            <option value="">Tous SLA</option>
+            <option value="WARNING,BREACHED">À risque ou dépassés</option>
+            <option value="BREACHED">Dépassés</option>
+            <option value="PAUSED">En pause</option>
+          </select>
+        )}
+        {can('ticket:read:all') && (
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={params.get('awaiting') === '1'}
+              onChange={(e) => setParam('awaiting', e.target.checked ? '1' : null)}
+            />
+            Réponse client en attente
+          </label>
+        )}
         {can('ticket:read:all') && (
           <select aria-label="Assignation" value={params.get('assignee') ?? ''} onChange={(e) => setParam('assignee', e.target.value)}>
             <option value="">Toutes assignations</option>
@@ -185,7 +242,7 @@ export function TicketListPage() {
               </thead>
               <tbody>
                 {data.items.map((t) => (
-                  <tr key={t.id}>
+                  <tr key={t.id} className={t.awaitingAgent && isOpenStatus(t.status) ? 'awaiting' : undefined}>
                     {columns.map((c) => (
                       <td key={c} className={c === 'subject' ? 'subject' : undefined}>
                         {CELLS[c](t, config)}

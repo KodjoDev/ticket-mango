@@ -4,7 +4,10 @@ import { ApiError } from './api/client';
 import { AuthProvider } from './auth/AuthContext';
 import { Layout } from './components/Layout';
 import { AdminIndex, AdminLayout, RequirePermission } from './pages/admin/AdminLayout';
+import { GroupsAdmin } from './pages/admin/GroupsAdmin';
 import { LayoutAdmin } from './pages/admin/LayoutAdmin';
+import { RoutingAdmin } from './pages/admin/RoutingAdmin';
+import { SlaAdmin } from './pages/admin/SlaAdmin';
 import { MacrosAdmin } from './pages/admin/MacrosAdmin';
 import { PriorityAdmin } from './pages/admin/PriorityAdmin';
 import { QualificationAdmin } from './pages/admin/QualificationAdmin';
@@ -41,6 +44,9 @@ export function AppRoutes() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminIndex />} />
           <Route path="users" element={<RequirePermission permission="user:manage"><UsersAdmin /></RequirePermission>} />
+          <Route path="groups" element={<RequirePermission permission="settings:manage"><GroupsAdmin /></RequirePermission>} />
+          <Route path="routing" element={<RequirePermission permission="settings:manage"><RoutingAdmin /></RequirePermission>} />
+          <Route path="sla" element={<RequirePermission permission="settings:manage"><SlaAdmin /></RequirePermission>} />
           <Route path="qualification" element={<RequirePermission permission="settings:manage"><QualificationAdmin /></RequirePermission>} />
           <Route path="priority" element={<RequirePermission permission="settings:manage"><PriorityAdmin /></RequirePermission>} />
           <Route path="tags" element={<RequirePermission permission="settings:manage"><TagsAdmin /></RequirePermission>} />

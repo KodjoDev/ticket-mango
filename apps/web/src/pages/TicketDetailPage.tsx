@@ -81,6 +81,9 @@ export function TicketDetailPage() {
           {t.component && <span>· {config.label('COMPONENT', t.component)}</span>}
           {t.environment && <span>· {config.label('ENVIRONMENT', t.environment)}</span>}
           <TagList tags={t.tags} />
+          {t.awaitingAgent && t.status !== 'RESOLVED' && t.status !== 'CLOSED' && (
+            <span className="badge awaiting-badge">Réponse client en attente</span>
+          )}
           <span className="muted">
             · ouvert par {t.requester.name} le {formatDate(t.createdAt)}
           </span>

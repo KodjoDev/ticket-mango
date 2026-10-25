@@ -5,6 +5,7 @@ import type {
   OptionField,
   PriorityMatrix,
   Role,
+  SlaPolicy,
   TicketFormField,
   TicketStatus,
   ViewFilters,
@@ -16,8 +17,13 @@ import type {
   Booking,
   Comment,
   FieldOption,
+  AdminGroup,
   Macro,
   ManagedUser,
+  Notification,
+  RoutingRule,
+  RuleConditions,
+  TicketDetail,
   Meeting,
   Page,
   SpellcheckIssue,
@@ -84,7 +90,9 @@ export const api = {
   agents: () => request<Agent[]>('GET', '/agents'),
 
   tickets: (filters: TicketFilters) => request<Page<Ticket>>('GET', `/tickets${toQueryString(filters)}`),
-  ticket: (id: number) => request<Ticket>('GET', `/tickets/${id}`),
+  ticket: (id: number) => request<TicketDetail>('GET', `/tickets/${id}`),
+  setParent: (id: number, parentId: number | null) => request<TicketDetail>('PUT', `/tickets/${id}/parent`, { parentId }),
+  route: (id: number) => request<Ticket>('POST', `/tickets/${id}/route`),
   createTicket: (input: TicketInput & { subject: string; description: string }) =>
     request<Ticket>('POST', '/tickets', input),
   updateTicket: (id: number, input: TicketInput) => request<Ticket>('PATCH', `/tickets/${id}`, input),
@@ -111,6 +119,10 @@ export const api = {
   macros: () => request<Macro[]>('GET', '/macros'),
   applyMacro: (macroId: string, ticketId: number, body: string) =>
     request<{ comment: Comment; ticket: Ticket }>('POST', `/macros/${macroId}/apply`, { ticketId, body }),
+
+  notifications: () => request<{ items: Notification[]; unread: number }>('GET', '/notifications'),
+  markNotificationRead: (id: string) => request<void>('POST', `/notifications/${id}/read`),
+  markAllNotificationsRead: () => request<void>('POST', '/notifications/read-all'),
 
   spellcheck: (text: string) => request<{ issues: SpellcheckIssue[] }>('POST', '/spellcheck', { text }),
 };
@@ -158,4 +170,23 @@ export const adminApi = {
     request<Macro>('PATCH', `/admin/macros/${id}`, input),
   reorderMacros: (ids: string[]) => request<Macro[]>('PUT', '/admin/macros/order', { ids }),
   deleteMacro: (id: string) => request<void>('DELETE', `/admin/macros/${id}`),
+
+  groups: () => request<AdminGroup[]>('GET', '/admin/groups'),
+  createGroup: (input: { name: string; distribution: AdminGroup['distribution']; description?: string | null; managerId?: string | null; memberIds?: string[] }) =>
+    request<AdminGroup>('POST', '/admin/groups', input),
+  updateGroup: (
+    id: string,
+    input: Partial<{ name: string; description: string | null; distribution: AdminGroup['distribution']; managerId: string | null; memberIds: string[]; isActive: boolean }>,
+  ) => request<AdminGroup>('PATCH', `/admin/groups/${id}`, input),
+  deleteGroup: (id: string) => request<void>('DELETE', `/admin/groups/${id}`),
+
+  routingRules: () => request<RoutingRule[]>('GET', '/admin/routing-rules'),
+  createRule: (input: { name: string; conditions: RuleConditions; groupId: string }) =>
+    request<RoutingRule>('POST', '/admin/routing-rules', input),
+  updateRule: (id: string, input: Partial<{ name: string; conditions: RuleConditions; groupId: string; isActive: boolean }>) =>
+    request<RoutingRule>('PATCH', `/admin/routing-rules/${id}`, input),
+  reorderRules: (ids: string[]) => request<RoutingRule[]>('PUT', '/admin/routing-rules/order', { ids }),
+  deleteRule: (id: string) => request<void>('DELETE', `/admin/routing-rules/${id}`),
+
+  saveSlaPolicy: (policy: SlaPolicy) => request<SlaPolicy>('PUT', '/admin/sla-policy', policy),
 };

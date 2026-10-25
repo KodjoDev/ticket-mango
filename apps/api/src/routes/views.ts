@@ -1,22 +1,23 @@
 import type { PrismaClient } from '@prisma/client';
 import type { ViewFilters } from '@ticketing/shared';
 import type { FastifyPluginAsync } from 'fastify';
-import type { ConfigService } from '../services/config';
-import { TicketService, viewToFilters } from '../services/tickets';
+import { viewToFilters, type TicketService } from '../services/tickets';
 
 /** Vues de la barre latérale, avec le nombre de tickets correspondant pour l'agent connecté. */
-export const viewRoutes: FastifyPluginAsync<{ prisma: PrismaClient; config: ConfigService }> = async (
+export const viewRoutes: FastifyPluginAsync<{ prisma: PrismaClient; tickets: TicketService }> = async (
   app,
-  { prisma, config },
+  { prisma, tickets },
 ) => {
-  const tickets = new TicketService(prisma, config);
-
   app.get('/', { preHandler: [app.authenticate, app.requirePermission('ticket:read:all')] }, async (request) => {
-    const views = await prisma.view.findMany({ orderBy: { position: 'asc' } });
+    const user = request.currentUser;
+    const [views, groupIds] = await Promise.all([
+      prisma.view.findMany({ orderBy: { position: 'asc' } }),
+      tickets.userGroupIds(user.id),
+    ]);
     return Promise.all(
       views.map(async (view) => ({
         ...view,
-        count: await tickets.count(request.currentUser, viewToFilters(request.currentUser, view.filters as ViewFilters)),
+        count: await tickets.count(user, viewToFilters(user, view.filters as ViewFilters, groupIds)),
       })),
     );
   });
