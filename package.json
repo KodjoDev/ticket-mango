@@ -13,21 +13,21 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "npm run build -w @ticketing/shared && npm run build -w @ticketing/api",
+    "build": "npm run build -w @ticketing/shared && npm run build -w @ticketing/api && npm run build -w @ticketing/web",
     "typecheck": "npm run build -w @ticketing/shared && npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "test": "npm test --workspaces --if-present",
-    "dev": "npm run build -w @ticketing/shared && npm run dev -w @ticketing/api"
+    "dev": "npm run build -w @ticketing/shared && npm run dev -w @ticketing/api",
+    "dev:web": "npm run dev -w @ticketing/web"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
-    "@types/jest": "^30.0.0",
     "@types/node": "^24.19.2",
     "eslint": "^9.39.0",
-    "jest": "^30.5.2",
-    "ts-jest": "^29.4.15",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.72.0"
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^5.0.5"
   },
   "allowScripts": {
     "prisma@6.19.3": true,

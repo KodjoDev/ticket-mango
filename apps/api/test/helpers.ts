@@ -5,7 +5,7 @@ import { buildApp } from '../src/app';
 import { hashPassword } from '../src/lib/password';
 
 /** Les tests d'intégration exigent une base PostgreSQL migrée (DATABASE_URL). */
-export const describeDb = process.env.DATABASE_URL ? describe : describe.skip;
+export const describeDb = describe.skipIf(!process.env.DATABASE_URL);
 
 export const PASSWORD = 'mot-de-passe-de-test';
 
@@ -18,7 +18,7 @@ export async function setup(): Promise<TestContext> {
   const prisma = new PrismaClient();
   const app = await buildApp({
     prisma,
-    config: { JWT_SECRET: 'x'.repeat(32), JWT_EXPIRES_IN: '1h', LOGIN_RATE_LIMIT: 10_000 },
+    config: { JWT_SECRET: 'x'.repeat(32), JWT_EXPIRES_IN: '1h', LOGIN_RATE_LIMIT: 10_000, COOKIE_SECURE: false },
   });
   await app.ready();
   return { app, prisma };

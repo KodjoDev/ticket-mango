@@ -6,6 +6,7 @@ Solution de ticketing et de gestion des incidents : réception multi-canal, qual
 
 ```
 apps/api          API REST (Fastify, Prisma, PostgreSQL)
+apps/web          Interface agent (React, Vite, TanStack Query)
 packages/shared   Domaine partagé : taxonomie, matrice de priorité, workflow, rôles
 ```
 
@@ -20,7 +21,10 @@ cp apps/api/.env.example apps/api/.env   # puis renseigner JWT_SECRET
 npm run db:deploy -w @ticketing/api      # applique les migrations
 npm run db:seed -w @ticketing/api        # crée le premier administrateur
 npm run dev                              # API sur http://localhost:3000
+npm run dev:web                          # interface sur http://localhost:5173
 ```
+
+En développement, Vite relaie `/api` vers l'API. En production, servez `apps/web/dist` et faites relayer `/api` vers l'API par le reverse proxy (même origine), avec `COOKIE_SECURE=true` derrière HTTPS.
 
 ## Tests
 
@@ -38,14 +42,16 @@ npm test
 
 Attention : les tests d'intégration **vident les tables** de la base ciblée.
 
-## API (lot 1)
+## API
 
-Toutes les routes, sauf `/health` et `/auth/login`, exigent l'en-tête `Authorization: Bearer <jeton>`.
+Toutes les routes, sauf `/health`, `/auth/login` et `/auth/logout`, exigent une session : le cookie `httpOnly` posé à la connexion (navigateur) ou l'en-tête `Authorization: Bearer <jeton>` (clients d'API).
 
 | Méthode | Route | Description |
 |---|---|---|
 | `POST` | `/auth/login` | Connexion (`email`, `password`) → jeton JWT |
+| `POST` | `/auth/logout` | Déconnexion (efface le cookie) |
 | `GET` | `/auth/me` | Utilisateur courant |
+| `GET` | `/agents` | Agents assignables |
 | `GET` / `POST` / `PATCH` | `/users`, `/users/:id` | Gestion des comptes (administrateur) |
 | `GET` | `/tickets` | Liste paginée ; filtres `status`, `priority` (valeurs séparées par des virgules), `type`, `component`, `assigneeId`, `q`, `page`, `pageSize` |
 | `POST` | `/tickets` | Création |
