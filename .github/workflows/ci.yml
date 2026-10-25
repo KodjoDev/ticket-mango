@@ -12,8 +12,8 @@ jobs:
 
     strategy:
       matrix:
-        # Fastify 5 exige Node.js 20 ou plus.
-        node-version: [20.x, 22.x]
+        # Node 24.9+ requis : Jest doit charger des dépendances ESM (cookie@2 via fastify.inject).
+        node-version: [24.x, 26.x]
 
     # Base PostgreSQL éphémère pour les tests d'intégration de l'API.
     services:
@@ -36,10 +36,10 @@ jobs:
 
     steps:
     - name: Récupérer le code du dépôt
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Configurer Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'

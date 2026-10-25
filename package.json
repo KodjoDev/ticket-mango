@@ -10,7 +10,7 @@
     "apps/*"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=24.9"
   },
   "scripts": {
     "build": "npm run build -w @ticketing/shared && npm run build -w @ticketing/api",
@@ -22,7 +22,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.0",
     "@types/jest": "^30.0.0",
-    "@types/node": "^22.10.0",
+    "@types/node": "^24.19.2",
     "eslint": "^9.39.0",
     "jest": "^30.5.2",
     "ts-jest": "^29.4.15",

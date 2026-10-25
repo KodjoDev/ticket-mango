@@ -11,7 +11,7 @@ packages/shared   Domaine partagé : taxonomie, matrice de priorité, workflow, 
 
 ## Démarrage
 
-Prérequis : Node.js 20+ et Docker (ou un PostgreSQL 17 accessible).
+Prérequis : Node.js 24.9+ et Docker (ou un PostgreSQL 17 accessible).
 
 ```bash
 npm install
