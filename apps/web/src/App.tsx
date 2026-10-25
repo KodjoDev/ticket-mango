@@ -3,6 +3,13 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { ApiError } from './api/client';
 import { AuthProvider } from './auth/AuthContext';
 import { Layout } from './components/Layout';
+import { AdminIndex, AdminLayout, RequirePermission } from './pages/admin/AdminLayout';
+import { LayoutAdmin } from './pages/admin/LayoutAdmin';
+import { PriorityAdmin } from './pages/admin/PriorityAdmin';
+import { QualificationAdmin } from './pages/admin/QualificationAdmin';
+import { TagsAdmin } from './pages/admin/TagsAdmin';
+import { UsersAdmin } from './pages/admin/UsersAdmin';
+import { ViewsAdmin } from './pages/admin/ViewsAdmin';
 import { LoginPage } from './pages/LoginPage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
 import { TicketListPage } from './pages/TicketListPage';
@@ -28,6 +35,15 @@ export function AppRoutes() {
         <Route path="/tickets" element={<TicketListPage />} />
         <Route path="/tickets/new" element={<TicketNewPage />} />
         <Route path="/tickets/:id" element={<TicketDetailPage />} />
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminIndex />} />
+          <Route path="users" element={<RequirePermission permission="user:manage"><UsersAdmin /></RequirePermission>} />
+          <Route path="qualification" element={<RequirePermission permission="settings:manage"><QualificationAdmin /></RequirePermission>} />
+          <Route path="priority" element={<RequirePermission permission="settings:manage"><PriorityAdmin /></RequirePermission>} />
+          <Route path="tags" element={<RequirePermission permission="settings:manage"><TagsAdmin /></RequirePermission>} />
+          <Route path="layout" element={<RequirePermission permission="settings:manage"><LayoutAdmin /></RequirePermission>} />
+          <Route path="views" element={<RequirePermission permission="settings:manage"><ViewsAdmin /></RequirePermission>} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/tickets" replace />} />
     </Routes>

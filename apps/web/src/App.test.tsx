@@ -1,8 +1,8 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toQueryString } from './api/client';
-import { filtersFromParams } from './pages/TicketListPage';
-import { agent, external, makeTicket, mockApi, renderApp } from './test/utils';
+import { filtersFromParams } from './filters';
+import { agent, external, makeTicket, mockApi, renderApp, testConfig } from './test/utils';
 
 const page = (items = [makeTicket()]) => ({ items, total: items.length, page: 1, pageSize: 25 });
 
@@ -56,16 +56,53 @@ describe('liste des tickets', () => {
     await waitFor(() => expect(calls.at(-1)!.search).toContain('priority=P0'));
   });
 
-  it('propose « Assignés à moi » aux agents seulement', async () => {
+  it('réserve le filtre d’assignation et les vues aux agents', async () => {
     mockApi({ 'GET /auth/me': external, 'GET /tickets': page() });
     renderApp('/tickets');
     await screen.findByRole('link', { name: 'Erreur 500 au login' });
-    expect(screen.queryByLabelText('Assignés à moi')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Assignation')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Mes demandes' })).toBeInTheDocument();
+  });
+
+  it('affiche les vues avec leur nombre et applique leurs filtres', async () => {
+    const calls = mockApi({
+      'GET /auth/me': agent,
+      'GET /tickets': page(),
+      'GET /views': [
+        { id: 'v1', name: 'Incidents P0 / P1', filters: { status: 'open', priority: ['P0', 'P1'] }, position: 0, count: 3 },
+      ],
+    });
+    renderApp('/tickets');
+    const link = await screen.findByRole('link', { name: /Incidents P0 \/ P1/ });
+    expect(link).toHaveTextContent('3');
+    await userEvent.click(link);
+    await waitFor(() => expect(calls.at(-1)!.search).toContain('priority=P0%2CP1'));
+    expect(link).toHaveClass('active');
+  });
+
+  it('suit l’ordre et la visibilité des colonnes définis par l’administrateur', async () => {
+    mockApi({
+      'GET /auth/me': agent,
+      'GET /tickets': page([makeTicket({ tags: [{ id: 'tag-vip', name: 'VIP', color: '#cc3340' }] })]),
+      'GET /config': {
+        ...testConfig,
+        listColumns: [
+          { key: 'tags', visible: true },
+          { key: 'subject', visible: true },
+          ...testConfig.listColumns.filter((c) => !['tags', 'subject'].includes(c.key)).map((c) => ({ ...c, visible: false })),
+        ],
+      },
+    });
+    renderApp('/tickets');
+    await screen.findByRole('link', { name: 'Erreur 500 au login' });
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Tags', 'Sujet']);
+    expect(within(screen.getByRole('table')).getByText('VIP')).toBeInTheDocument();
   });
 
   it('traduit les paramètres d’URL en filtres d’API', () => {
-    const filters = filtersFromParams(new URLSearchParams('status=all&mine=1&q=facture&page=3'), 'u1');
-    expect(filters).toMatchObject({ status: undefined, assigneeId: 'u1', q: 'facture', page: 3 });
+    const filters = filtersFromParams(new URLSearchParams('status=all&assignee=me&q=facture&page=3&tag=t1'), 'u1');
+    expect(filters).toMatchObject({ status: undefined, assigneeId: 'u1', q: 'facture', page: 3, tagId: 't1' });
+    expect(filtersFromParams(new URLSearchParams('status=NEW,IN_QA'), 'u1').status).toEqual(['NEW', 'IN_QA']);
     expect(toQueryString({ status: ['NEW', 'IN_QA'], q: '', page: 2 })).toBe('?status=NEW%2CIN_QA&page=2');
   });
 });
@@ -121,7 +158,8 @@ describe('détail d’un ticket', () => {
     expect(await screen.findByRole('heading', { name: /Erreur 500 au login/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Clôturer' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Note interne' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Urgence')).toBeDisabled();
+    expect(screen.getByLabelText('Type')).toBeDisabled();
+    expect(screen.queryByLabelText('Urgence')).not.toBeInTheDocument();
     expect(screen.queryByText('Historique')).not.toBeInTheDocument();
   });
 
@@ -140,6 +178,22 @@ describe('détail d’un ticket', () => {
         expect.objectContaining({ method: 'POST', body: { body: 'À vérifier côté cache', isInternal: true } }),
       ),
     );
+  });
+
+  it('propose les tags actifs et envoie la nouvelle liste', async () => {
+    const calls = mockApi({ ...detailRoutes(), 'PATCH /tickets/42': () => ({ json: makeTicket() }) });
+    renderApp('/tickets/42');
+    const vip = await screen.findByRole('button', { name: 'VIP' });
+    expect(screen.queryByRole('button', { name: 'Ancien' })).not.toBeInTheDocument();
+    await userEvent.click(vip);
+    await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({ method: 'PATCH', body: { tagIds: ['tag-vip'] } })));
+  });
+
+  it('affiche une valeur archivée encore portée par le ticket sans la proposer ailleurs', async () => {
+    mockApi(detailRoutes(agent, makeTicket({ type: 'LEGACY' })));
+    renderApp('/tickets/42');
+    const select = await screen.findByLabelText('Type');
+    expect(select).toHaveDisplayValue('Ancien type (archivé)');
   });
 
   it('distingue visuellement les notes internes', async () => {

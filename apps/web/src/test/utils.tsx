@@ -2,10 +2,46 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { AppRoutes, createQueryClient } from '../App';
-import type { Ticket, User } from '../api/types';
+import { DEFAULT_LIST_COLUMNS, DEFAULT_PRIORITY_MATRIX, DEFAULT_TICKET_FORM } from '@ticketing/shared';
+import type { AppConfig, FieldOption, Ticket, User } from '../api/types';
 import { AuthProvider } from '../auth/AuthContext';
 
 type Handler = (body: unknown, url: URL) => { status?: number; json?: unknown };
+
+const option = (field: FieldOption['field'], key: string, label: string, position: number, extra: Partial<FieldOption> = {}) => ({
+  id: `${field}-${key}`,
+  field,
+  key,
+  label,
+  position,
+  isActive: true,
+  isSystem: false,
+  ...extra,
+});
+
+export const testConfig: AppConfig = {
+  options: [
+    option('TYPE', 'BUG', 'Bug / Incident technique', 0, { isSystem: true }),
+    option('TYPE', 'QUESTION', 'Question / Assistance', 1, { isSystem: true }),
+    option('TYPE', 'LEGACY', 'Ancien type', 2, { isActive: false }),
+    option('COMPONENT', 'AUTH', 'Authentification', 0),
+    option('COMPONENT', 'BILLING', 'Facturation', 1),
+    option('ENVIRONMENT', 'PRODUCTION', 'Production', 0),
+  ],
+  tags: [
+    { id: 'tag-vip', name: 'VIP', color: '#cc3340', isActive: true },
+    { id: 'tag-old', name: 'Ancien', color: '#5c6970', isActive: false },
+  ],
+  priorityMatrix: DEFAULT_PRIORITY_MATRIX,
+  ticketForm: DEFAULT_TICKET_FORM,
+  listColumns: DEFAULT_LIST_COLUMNS,
+};
+
+/** Réponses communes à toutes les pages authentifiées ; chaque test peut les surcharger. */
+const DEFAULT_ROUTES: Record<string, object> = {
+  'GET /config': testConfig,
+  'GET /views': [],
+};
 
 /**
  * Remplace fetch par une table de routes « MÉTHODE /chemin ».
@@ -21,7 +57,7 @@ export function mockApi(routes: Record<string, Handler | object>) {
       const path = url.pathname.replace(/^\/api/, '');
       const body = init.body ? JSON.parse(String(init.body)) : undefined;
       calls.push({ method, path, search: url.search, body });
-      const route = routes[`${method} ${path}`];
+      const route = routes[`${method} ${path}`] ?? DEFAULT_ROUTES[`${method} ${path}`];
       if (!route) return new Response(JSON.stringify({ message: 'Introuvable' }), { status: 404 });
       const { status = 200, json } = typeof route === 'function' ? (route as Handler)(body, url) : { json: route };
       return new Response(status === 204 ? null : JSON.stringify(json), { status });
@@ -60,6 +96,7 @@ export function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     status: 'NEW',
     requester: { id: external.id, name: external.name, email: external.email },
     assignee: null,
+    tags: [],
     firstResponseAt: null,
     resolvedAt: null,
     closedAt: null,

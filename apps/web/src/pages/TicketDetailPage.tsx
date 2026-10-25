@@ -1,17 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
-import { COMPONENT_LABELS, ENVIRONMENT_LABELS, TICKET_TYPE_LABELS } from '@ticketing/shared';
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { AuditTrail } from '../components/AuditTrail';
 import { Conversation } from '../components/Conversation';
+import { TagList } from '../components/tags';
 import { TicketSidebar } from '../components/TicketSidebar';
 import { ErrorMessage, formatDate, PriorityBadge, Spinner, StatusBadge } from '../components/ui';
+import { useConfig } from '../config/ConfigContext';
 
 export function TicketDetailPage() {
   const id = Number(useParams().id);
   const { can } = useAuth();
+  const config = useConfig();
 
   const ticket = useQuery({ queryKey: ['ticket', id], queryFn: () => api.ticket(id) });
   const comments = useQuery({ queryKey: ['ticket', id, 'comments'], queryFn: () => api.comments(id) });
@@ -52,9 +54,10 @@ export function TicketDetailPage() {
         <div className="ticket-meta">
           <PriorityBadge priority={t.priority} />
           <StatusBadge status={t.status} />
-          <span>{TICKET_TYPE_LABELS[t.type]}</span>
-          {t.component && <span>· {COMPONENT_LABELS[t.component]}</span>}
-          {t.environment && <span>· {ENVIRONMENT_LABELS[t.environment]}</span>}
+          <span>{config.label('TYPE', t.type)}</span>
+          {t.component && <span>· {config.label('COMPONENT', t.component)}</span>}
+          {t.environment && <span>· {config.label('ENVIRONMENT', t.environment)}</span>}
+          <TagList tags={t.tags} />
           <span className="muted">
             · ouvert par {t.requester.name} le {formatDate(t.createdAt)}
           </span>

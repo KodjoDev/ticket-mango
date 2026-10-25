@@ -1,11 +1,4 @@
-import {
-  COMPONENT_LABELS,
-  ENVIRONMENT_LABELS,
-  IMPACT_LABELS,
-  STATUS_LABELS,
-  TICKET_TYPE_LABELS,
-  URGENCY_LABELS,
-} from '@ticketing/shared';
+import { IMPACT_LABELS, STATUS_LABELS, URGENCY_LABELS, type OptionField } from '@ticketing/shared';
 
 /** Libellés lisibles des actions du journal d'audit. */
 export const AUDIT_ACTION_LABELS: Record<string, string> = {
@@ -14,6 +7,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'ticket.status_changed': 'a changé le statut',
   'comment.created': 'a ajouté un commentaire',
 };
+
+const LIST_FIELDS: Record<string, OptionField> = { type: 'TYPE', component: 'COMPONENT', environment: 'ENVIRONMENT' };
 
 export const FIELD_LABELS: Record<string, string> = {
   subject: 'Sujet',
@@ -27,21 +22,28 @@ export const FIELD_LABELS: Record<string, string> = {
   priorityOverridden: 'Priorité forcée',
   assigneeId: 'Assigné',
   status: 'Statut',
+  tags: 'Tags',
 };
 
 const VALUE_LABELS: Record<string, Record<string, string>> = {
-  type: TICKET_TYPE_LABELS,
-  component: COMPONENT_LABELS,
-  environment: ENVIRONMENT_LABELS,
   impact: IMPACT_LABELS,
   urgency: URGENCY_LABELS,
   status: STATUS_LABELS,
 };
 
-/** Rend lisible une valeur du journal d'audit ; `names` résout les identifiants d'utilisateurs. */
-export function formatAuditValue(field: string, value: unknown, names: Map<string, string>): string {
+interface AuditContext {
+  /** Noms des utilisateurs, pour les identifiants d'assignation. */
+  names: Map<string, string>;
+  /** Libellé courant d'une clé de liste administrable. */
+  label: (field: OptionField, key: string) => string;
+}
+
+/** Rend lisible une valeur du journal d'audit. */
+export function formatAuditValue(field: string, value: unknown, ctx: AuditContext): string {
   if (value === null || value === undefined) return '—';
   if (typeof value === 'boolean') return value ? 'Oui' : 'Non';
-  if (field === 'assigneeId') return names.get(String(value)) ?? 'un agent';
+  if (Array.isArray(value)) return value.length ? value.join(', ') : 'aucun';
+  if (field === 'assigneeId') return ctx.names.get(String(value)) ?? 'un agent';
+  if (LIST_FIELDS[field]) return ctx.label(LIST_FIELDS[field], String(value));
   return VALUE_LABELS[field]?.[String(value)] ?? String(value);
 }
