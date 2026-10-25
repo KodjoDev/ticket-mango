@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        # Node 24.9+ requis : Jest doit charger des dépendances ESM (cookie@2 via fastify.inject).
+        # Versions LTS maintenues (Node 20 n'est plus supporté depuis avril 2026).
         node-version: [24.x, 26.x]
 
     # Base PostgreSQL éphémère pour les tests d'intégration de l'API.
