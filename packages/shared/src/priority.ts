@@ -33,6 +33,19 @@ export function isMajorIncidentPriority(priority: Priority): boolean {
   return priority === 'P0' || priority === 'P1';
 }
 
+export const IMPACT_LABELS: Record<Impact, string> = {
+  INDIVIDUAL: 'Individuel',
+  TEAM: 'Équipe',
+  ORGANIZATION: 'Organisation / Global',
+};
+
+export const URGENCY_LABELS: Record<Urgency, string> = {
+  LOW: 'Basse',
+  MEDIUM: 'Moyenne',
+  HIGH: 'Haute',
+  CRITICAL: 'Critique',
+};
+
 export const PRIORITY_LABELS: Record<Priority, string> = {
   P0: 'P0 - Incident majeur',
   P1: 'P1 - Critique',
