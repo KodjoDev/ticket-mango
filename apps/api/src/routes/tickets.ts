@@ -1,6 +1,7 @@
 import { IMPACTS, OPTION_KEY_PATTERN, PRIORITIES, SLA_STATES, TICKET_STATUSES, URGENCIES } from '@ticketing/shared';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { readMultipart } from '../lib/multipart';
 import { isStaff, type TicketService } from '../services/tickets';
 
 const subject = z.string().trim().min(1).max(250);
@@ -114,11 +115,33 @@ export const ticketRoutes: FastifyPluginAsync<{ tickets: TicketService }> = asyn
     return tickets.listComments(request.currentUser, id);
   });
 
+  // JSON, ou multipart (champs body/isInternal + fichiers) pour joindre des pièces.
   app.post('/:id/comments', async (request, reply) => {
     const { id } = idParams.parse(request.params);
-    const { body, isInternal } = commentSchema.parse(request.body);
-    const comment = await tickets.addComment(request.currentUser, id, body, isInternal);
+    let payload: unknown = request.body;
+    let files: Awaited<ReturnType<typeof readMultipart>>['files'] = [];
+    if (request.isMultipart()) {
+      const form = await readMultipart(request);
+      payload = { body: form.fields.body, isInternal: form.fields.isInternal === 'true' };
+      files = form.files;
+    }
+    const { body, isInternal } = commentSchema.parse(payload);
+    const comment = await tickets.addComment(request.currentUser, id, body, isInternal, { files });
     return reply.status(201).send(comment);
+  });
+
+  app.post('/:id/attachments', async (request, reply) => {
+    const { id } = idParams.parse(request.params);
+    if (!request.isMultipart()) return reply.badRequest('Formulaire multipart attendu');
+    const { files } = await readMultipart(request);
+    if (files.length === 0) return reply.badRequest('Aucun fichier reçu');
+    return reply.status(201).send(await tickets.addAttachments(request.currentUser, id, files));
+  });
+
+  app.post('/:id/merge', async (request) => {
+    const { id } = idParams.parse(request.params);
+    const { targetId } = z.object({ targetId: z.number().int().positive() }).strict().parse(request.body);
+    return tickets.merge(request.currentUser, id, targetId);
   });
 
   app.get('/:id/audit', async (request) => {

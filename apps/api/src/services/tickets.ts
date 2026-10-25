@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, Ticket } from '@prisma/client';
+import type { Channel, Prisma, PrismaClient, Ticket } from '@prisma/client';
 import {
   canTransition,
   computePriority,
@@ -22,6 +22,8 @@ import type { CurrentUser } from '../plugins/auth';
 import type { ConfigService } from './config';
 import type { NotificationService } from './notifications';
 import type { RoutingService } from './routing';
+import { attachmentSelect, type AttachmentService, type IncomingFile } from './attachments';
+import type { OutboundMailer } from './email/outbound';
 import { slaPausesSelect, type SlaService } from './sla';
 
 type Tx = Prisma.TransactionClient;
@@ -33,8 +35,32 @@ export const ticketInclude = {
   tags: { select: { tag: { select: { id: true, name: true, color: true } } } },
   slaPauses: slaPausesSelect,
   parent: { select: { id: true, subject: true, status: true } },
+  mergedInto: { select: { id: true, subject: true } },
+  // Pièces jointes de la demande initiale (celles des messages sont rattachées aux commentaires).
+  attachments: { where: { commentId: null }, select: attachmentSelect, orderBy: { createdAt: 'asc' } },
   _count: { select: { children: true } },
 } satisfies Prisma.TicketInclude;
+
+/** Options réservées aux traitements internes (réception d'e-mails) : elles contournent les permissions. */
+export interface SystemCreateOptions {
+  channel: Channel;
+  mailboxId?: string | null;
+  groupId?: string | null;
+  /** Texte ajouté en tête de la description (ex. « Suite du ticket #12 »). */
+  descriptionPrefix?: string;
+}
+
+export interface CommentOptions {
+  channel?: Channel;
+  /** Message-ID de l'e-mail à l'origine du commentaire. */
+  messageId?: string;
+  files?: IncomingFile[];
+}
+
+const commentInclude = {
+  author: { select: { id: true, name: true } },
+  attachments: { select: attachmentSelect, orderBy: { createdAt: 'asc' } },
+} satisfies Prisma.CommentInclude;
 
 type TicketWithRelations = Prisma.TicketGetPayload<{ include: typeof ticketInclude }>;
 
@@ -123,6 +149,8 @@ export interface TicketDeps {
   sla: SlaService;
   routing: RoutingService;
   notifications: NotificationService;
+  attachments: AttachmentService;
+  mailer: OutboundMailer;
 }
 
 export class TicketService {
@@ -280,7 +308,7 @@ export class TicketService {
     await this.d.notifications.notify(tx, [assigneeId], { ticketId: ticket.id, kind, message });
   }
 
-  async create(user: CurrentUser, input: CreateTicketInput) {
+  async create(user: CurrentUser, input: CreateTicketInput, system?: SystemCreateOptions) {
     if (input.priority !== undefined) ensure(user, 'ticket:priority:override');
     if (input.tagIds?.length) ensure(user, 'ticket:qualify');
     if (input.assigneeId) {
@@ -307,7 +335,7 @@ export class TicketService {
     const urgency = input.urgency ?? 'MEDIUM';
     const data = {
       subject: input.subject,
-      description: input.description,
+      description: system?.descriptionPrefix ? `${system.descriptionPrefix}\n\n${input.description}` : input.description,
       type,
       component: input.component ?? null,
       environment: input.environment ?? null,
@@ -319,8 +347,9 @@ export class TicketService {
       assigneeId: input.assigneeId ?? null,
     };
     const openedByCustomer = !isStaff(user) && data.requesterId === user.id;
-    const routedGroup = input.groupId === undefined ? await this.d.routing.findGroup(data) : null;
-    const groupId = input.groupId ?? routedGroup?.id ?? null;
+    const presetGroupId = input.groupId ?? system?.groupId ?? undefined;
+    const routedGroup = presetGroupId === undefined ? await this.d.routing.findGroup(data) : null;
+    const groupId = presetGroupId ?? routedGroup?.id ?? null;
 
     return this.prisma.$transaction(async (tx) => {
       // Distribution automatique si le groupe vient du routage et que personne n'est désigné.
@@ -332,6 +361,8 @@ export class TicketService {
           assigneeId,
           groupId,
           ...(openedByCustomer && { lastRequesterReplyAt: new Date(), awaitingAgent: true }),
+          channel: system?.channel ?? 'WEB',
+          mailboxId: system?.mailboxId ?? null,
           tags: { create: tagIds.map((tagId) => ({ tagId })) },
         },
         include: ticketInclude,
@@ -512,40 +543,46 @@ export class TicketService {
     await this.findVisible(user, ticketId);
     return this.prisma.comment.findMany({
       where: { ticketId, ...(!hasPermission(user.role, 'comment:internal') && { isInternal: false }) },
-      include: { author: { select: { id: true, name: true } } },
+      include: {
+        ...commentInclude,
+        // État d'envoi par e-mail, visible du support seulement.
+        ...(isStaff(user) && { outbound: true }),
+      },
       orderBy: { createdAt: 'asc' },
     });
   }
 
-  async addComment(user: CurrentUser, ticketId: number, body: string, isInternal: boolean) {
+  async addComment(user: CurrentUser, ticketId: number, body: string, isInternal: boolean, options: CommentOptions = {}) {
     ensure(user, 'comment:create');
     ensure(user, isInternal ? 'comment:internal' : 'comment:public');
     const ticket = await this.findVisible(user, ticketId);
     if (ticket.status === 'CLOSED') throw conflict('Un ticket clôturé ne peut plus être commenté');
 
     return this.prisma.$transaction(async (tx) => {
-      const comment = await tx.comment.create({
-        data: { ticketId, authorId: user.id, body, isInternal },
-        include: { author: { select: { id: true, name: true } } },
+      const created = await tx.comment.create({
+        data: { ticketId, authorId: user.id, body, isInternal, channel: options.channel ?? 'WEB', messageId: options.messageId },
       });
+      for (const file of options.files ?? []) {
+        await this.d.attachments.save(tx, ticketId, created.id, file, user.id);
+      }
       // Première réponse (FRT) : premier commentaire public d'un membre du support.
       if (!isInternal && isStaff(user) && !ticket.firstResponseAt) {
         await tx.ticket.updateMany({
           where: { id: ticketId, firstResponseAt: null },
-          data: { firstResponseAt: comment.createdAt },
+          data: { firstResponseAt: created.createdAt },
         });
       }
       // Qui a parlé en dernier : une réponse du support solde l'attente, un message du demandeur la crée.
       if (!isInternal && isStaff(user)) {
         await tx.ticket.update({
           where: { id: ticketId },
-          data: { lastAgentReplyAt: comment.createdAt, awaitingAgent: false, updatedAt: ticket.updatedAt },
+          data: { lastAgentReplyAt: created.createdAt, awaitingAgent: false, updatedAt: ticket.updatedAt },
         });
       } else if (!isInternal && user.id === ticket.requesterId) {
         await tx.ticket.update({
           where: { id: ticketId },
           data: {
-            lastRequesterReplyAt: comment.createdAt,
+            lastRequesterReplyAt: created.createdAt,
             awaitingAgent: !['RESOLVED', 'CLOSED'].includes(ticket.status),
             updatedAt: ticket.updatedAt,
           },
@@ -556,7 +593,7 @@ export class TicketService {
           ticketId,
           actorId: user.id,
           action: 'comment.created',
-          changes: { commentId: comment.id, isInternal },
+          changes: { commentId: created.id, isInternal, ...(options.channel === 'EMAIL' && { channel: 'EMAIL' }) },
         },
       });
       // Le demandeur a répondu : le ticket reprend son cours et l'agent est prévenu.
@@ -566,7 +603,83 @@ export class TicketService {
       } else {
         await this.d.sla.refresh(tx, ticketId);
       }
-      return comment;
+      // Réponse publique du support : envoyée par e-mail au demandeur.
+      if (!isInternal && isStaff(user)) await this.d.mailer.enqueueComment(tx, ticketId, created.id);
+      return tx.comment.findUniqueOrThrow({ where: { id: created.id }, include: commentInclude });
+    });
+  }
+
+  /** Pièce jointe de la demande initiale (hors commentaire). */
+  saveAttachment(tx: Tx, ticketId: number, file: IncomingFile, userId: string | null) {
+    return this.d.attachments.save(tx, ticketId, null, file, userId);
+  }
+
+  /** Ajoute des pièces jointes à la demande initiale depuis l'interface. */
+  async addAttachments(user: CurrentUser, ticketId: number, files: IncomingFile[]) {
+    ensure(user, 'comment:create');
+    const ticket = await this.findVisible(user, ticketId);
+    if (ticket.status === 'CLOSED') throw conflict('Un ticket clôturé ne peut plus être modifié');
+    return this.prisma.$transaction(async (tx) => {
+      const saved = [];
+      for (const file of files) saved.push(await this.d.attachments.save(tx, ticketId, null, file, user.id));
+      await tx.auditLog.create({
+        data: { ticketId, actorId: user.id, action: 'attachment.added', changes: { files: saved.map((a) => a.filename) } },
+      });
+      return saved;
+    });
+  }
+
+  /**
+   * Fusionne un doublon dans le ticket conservé (CdC §2.2) : la demande et les messages
+   * publics du doublon sont recopiés en note interne, le doublon est clôturé, et les
+   * e-mails qui lui répondent arrivent désormais dans le ticket conservé.
+   */
+  async merge(user: CurrentUser, sourceId: number, targetId: number) {
+    ensure(user, 'ticket:qualify');
+    ensure(user, 'ticket:transition');
+    if (sourceId === targetId) throw badRequest('Un ticket ne peut pas être fusionné avec lui-même');
+    const source = await this.findVisible(user, sourceId);
+    const target = await this.findVisible(user, targetId).catch(() => {
+      throw badRequest(`Ticket #${targetId} introuvable`);
+    });
+    if (source.status === 'CLOSED') throw conflict(`Le ticket #${sourceId} est déjà clôturé`);
+    if (target.status === 'CLOSED' || target.mergedIntoId) throw conflict(`Le ticket #${targetId} est clôturé`);
+
+    const comments = await this.prisma.comment.findMany({
+      where: { ticketId: sourceId, isInternal: false },
+      include: { author: { select: { name: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    const summary = [
+      `Ticket #${sourceId} fusionné ici : « ${source.subject} », demandé par ${source.requester.name} (${source.requester.email}).`,
+      '',
+      source.description,
+      ...comments.map((c) => `\n— ${c.author.name}, ${c.createdAt.toISOString().slice(0, 16).replace('T', ' ')} UTC :\n${c.body}`),
+    ].join('\n');
+
+    return this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      await tx.comment.create({ data: { ticketId: targetId, authorId: user.id, body: summary.slice(0, 50_000), isInternal: true } });
+      await tx.comment.create({
+        data: { ticketId: sourceId, authorId: user.id, body: `Fusionné dans le ticket #${targetId}.`, isInternal: true },
+      });
+      // Les pièces jointes et les tickets rattachés suivent le ticket conservé.
+      await tx.attachment.updateMany({ where: { ticketId: sourceId }, data: { ticketId: targetId } });
+      await tx.ticket.updateMany({ where: { parentId: sourceId }, data: { parentId: targetId } });
+      await tx.ticket.update({
+        where: { id: sourceId },
+        data: { status: 'CLOSED', closedAt: now, mergedIntoId: targetId, awaitingAgent: false },
+      });
+      await tx.slaPause.updateMany({ where: { ticketId: sourceId, endedAt: null }, data: { endedAt: now } });
+      await tx.slaPause.create({ data: { ticketId: sourceId, startedAt: now } });
+      await tx.auditLog.create({
+        data: { ticketId: sourceId, actorId: user.id, action: 'ticket.merged', changes: { mergedInto: targetId, status: { from: source.status, to: 'CLOSED' } } },
+      });
+      await tx.auditLog.create({
+        data: { ticketId: targetId, actorId: user.id, action: 'ticket.merged_from', changes: { mergedFrom: sourceId } },
+      });
+      await this.d.sla.refresh(tx, sourceId);
+      return this.reload(tx, targetId);
     });
   }
 
