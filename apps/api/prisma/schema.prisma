@@ -18,6 +18,21 @@ enum Role {
   EXTERNAL_USER
 }
 
+/// Mode d'attribution des tickets aux membres d'un groupe (CdC §3.3).
+enum Distribution {
+  ROUND_ROBIN
+  LOAD
+  MANUAL
+}
+
+enum SlaState {
+  OK
+  WARNING
+  BREACHED
+  PAUSED
+  DONE
+}
+
 enum MeetingStatus {
   /// Créneaux proposés, en attente du choix du demandeur.
   PROPOSED
@@ -56,6 +71,7 @@ enum Priority {
 enum TicketStatus {
   NEW
   QUALIFYING
+  WAITING_CUSTOMER
   SENT_TO_DEV
   IN_PROGRESS
   IN_QA
@@ -80,39 +96,64 @@ model User {
   auditLogs         AuditLog[]
   organizedMeetings Meeting[]         @relation("organizer")
   meetingInvites    MeetingAttendee[]
+  groupMemberships  GroupMember[]
+  managedGroups     Group[]           @relation("manager")
+  notifications     Notification[]
 }
 
 model Ticket {
   /// Identifiant numérique lisible, utilisé dans les sujets d'email : [TICKET #12345].
-  id                 Int          @id @default(autoincrement())
-  subject            String
-  description        String
+  id                   Int          @id @default(autoincrement())
+  subject              String
+  description          String
   /// Clés de FieldOption (TYPE, COMPONENT, ENVIRONMENT), validées par l'API.
-  type               String       @default("QUESTION")
-  component          String?
-  environment        String?
-  impact             Impact       @default(INDIVIDUAL)
-  urgency            Urgency      @default(MEDIUM)
-  priority           Priority
+  type                 String       @default("QUESTION")
+  component            String?
+  environment          String?
+  impact               Impact       @default(INDIVIDUAL)
+  urgency              Urgency      @default(MEDIUM)
+  priority             Priority
   /// Vrai lorsque la priorité a été forcée manuellement au lieu de suivre la matrice.
-  priorityOverridden Boolean      @default(false)
-  status             TicketStatus @default(NEW)
-  requesterId        String       @db.Uuid
-  requester          User         @relation("requester", fields: [requesterId], references: [id])
-  assigneeId         String?      @db.Uuid
-  assignee           User?        @relation("assignee", fields: [assigneeId], references: [id])
-  firstResponseAt    DateTime?
-  resolvedAt         DateTime?
-  closedAt           DateTime?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  priorityOverridden   Boolean      @default(false)
+  status               TicketStatus @default(NEW)
+  requesterId          String       @db.Uuid
+  requester            User         @relation("requester", fields: [requesterId], references: [id])
+  assigneeId           String?      @db.Uuid
+  assignee             User?        @relation("assignee", fields: [assigneeId], references: [id])
+  groupId              String?      @db.Uuid
+  group                Group?       @relation(fields: [groupId], references: [id])
+  /// État SLA recalculé à chaque modification et par la tâche de surveillance.
+  slaState             SlaState     @default(OK)
+  /// Échéance SLA la plus proche (null si aucune ne court).
+  slaDueAt             DateTime?
+  /// Ticket référent (« ticket problème ») auquel celui-ci est rattaché ; un seul niveau.
+  parentId             Int?
+  parent               Ticket?      @relation("referent", fields: [parentId], references: [id], onDelete: SetNull)
+  children             Ticket[]     @relation("referent")
+  /// Dernier message public du demandeur et dernière réponse publique du support.
+  lastRequesterReplyAt DateTime?
+  lastAgentReplyAt     DateTime?
+  /// Vrai quand le demandeur s'est exprimé après la dernière réponse du support.
+  awaitingAgent        Boolean      @default(false)
+  firstResponseAt      DateTime?
+  resolvedAt           DateTime?
+  closedAt             DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 
-  comments  Comment[]
-  auditLogs AuditLog[]
-  tags      TicketTag[]
-  meetings  Meeting[]
+  comments      Comment[]
+  auditLogs     AuditLog[]
+  tags          TicketTag[]
+  meetings      Meeting[]
+  slaPauses     SlaPause[]
+  slaAlerts     SlaAlert[]
+  notifications Notification[]
 
   @@index([status])
+  @@index([groupId])
+  @@index([slaState, slaDueAt])
+  @@index([parentId])
+  @@index([awaitingAgent])
   @@index([priority])
   @@index([assigneeId])
   @@index([requesterId])
@@ -261,4 +302,88 @@ model Macro {
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+/// Groupe d'agents (Support N1, N2, DevOps…) recevant les tickets routés.
+model Group {
+  id                 String       @id @default(uuid()) @db.Uuid
+  name               String       @unique
+  description        String?
+  distribution       Distribution @default(MANUAL)
+  /// Responsable notifié des alertes SLA du groupe.
+  managerId          String?      @db.Uuid
+  manager            User?        @relation("manager", fields: [managerId], references: [id])
+  /// Dernier agent servi par le tour de rôle.
+  lastAssignedUserId String?      @db.Uuid
+  isActive           Boolean      @default(true)
+  position           Int
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  members GroupMember[]
+  tickets Ticket[]
+  rules   RoutingRule[]
+}
+
+model GroupMember {
+  groupId String @db.Uuid
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId  String @db.Uuid
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
+}
+
+/// Règle de routage : la première règle active dont les conditions correspondent désigne le groupe.
+model RoutingRule {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  /// { type?: string[], component?: string[], environment?: string[], priority?: Priority[] } ; vide = toujours.
+  conditions Json     @default("{}")
+  groupId    String   @db.Uuid
+  group      Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  position   Int
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+/// Période pendant laquelle le délai de résolution est suspendu (attente du client, ticket résolu).
+model SlaPause {
+  id        String    @id @default(uuid()) @db.Uuid
+  ticketId  Int
+  ticket    Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  startedAt DateTime
+  endedAt   DateTime?
+
+  @@index([ticketId])
+}
+
+/// Alerte SLA déjà émise, pour ne notifier qu'une fois par délai et par niveau.
+model SlaAlert {
+  ticketId  Int
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  /// FIRST_RESPONSE ou RESOLUTION
+  metric    String
+  /// WARNING ou BREACHED
+  level     String
+  createdAt DateTime @default(now())
+
+  @@id([ticketId, metric, level])
+}
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticketId  Int?
+  ticket    Ticket?   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  /// Ex. sla.warning, sla.breached, ticket.assigned
+  kind      String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
 }

@@ -5,6 +5,7 @@ import {
   OPTION_FIELDS,
   OPTION_KEY_PATTERN,
   PRIORITIES,
+  SLA_STATES,
   TICKET_FORM_FIELDS,
   TICKET_STATUSES,
 } from '@ticketing/shared';
@@ -35,6 +36,9 @@ const viewFiltersSchema = z
     type: optionKey.optional(),
     component: optionKey.optional(),
     assignee: z.union([z.literal('me'), z.literal('none'), z.string().uuid()]).optional(),
+    group: z.union([z.literal('mine'), z.string().uuid()]).optional(),
+    slaState: z.array(z.enum(SLA_STATES)).min(1).optional(),
+    awaitingAgent: z.boolean().optional(),
     tagId: z.string().uuid().optional(),
   })
   .strict();

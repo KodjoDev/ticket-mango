@@ -1,9 +1,7 @@
-import type { PrismaClient } from '@prisma/client';
-import { IMPACTS, OPTION_KEY_PATTERN, PRIORITIES, TICKET_STATUSES, URGENCIES } from '@ticketing/shared';
+import { IMPACTS, OPTION_KEY_PATTERN, PRIORITIES, SLA_STATES, TICKET_STATUSES, URGENCIES } from '@ticketing/shared';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import type { ConfigService } from '../services/config';
-import { isStaff, TicketService } from '../services/tickets';
+import { isStaff, type TicketService } from '../services/tickets';
 
 const subject = z.string().trim().min(1).max(250);
 const description = z.string().trim().min(1).max(50_000);
@@ -22,6 +20,7 @@ const staffCreateSchema = z
     priority: z.enum(PRIORITIES).optional(),
     requesterId: z.string().uuid().optional(),
     assigneeId: z.string().uuid().nullable().optional(),
+    groupId: z.string().uuid().nullable().optional(),
     tagIds: z.array(z.string().uuid()).max(50).optional(),
   })
   .strict();
@@ -50,7 +49,12 @@ const listQuerySchema = z.object({
   type: optionKey.optional(),
   component: optionKey.optional(),
   assigneeId: z.union([z.string().uuid(), z.literal('none')]).optional(),
+  /** Identifiant de groupe ou « mine » (groupes de l'agent connecté). */
+  groupId: z.union([z.string().uuid(), z.literal('mine')]).optional(),
+  slaState: csv(SLA_STATES),
+  sort: z.enum(['created', 'sla']).default('created'),
   tagId: z.string().uuid().optional(),
+  awaitingAgent: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
   q: z.string().trim().min(1).max(200).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
@@ -62,15 +66,15 @@ const commentSchema = z
   .object({ body: z.string().trim().min(1).max(50_000), isInternal: z.boolean().default(false) })
   .strict();
 
-export const ticketRoutes: FastifyPluginAsync<{ prisma: PrismaClient; config: ConfigService }> = async (
-  app,
-  { prisma, config },
-) => {
-  const tickets = new TicketService(prisma, config);
-
+export const ticketRoutes: FastifyPluginAsync<{ tickets: TicketService }> = async (app, { tickets }) => {
   app.addHook('preHandler', app.authenticate);
 
-  app.get('/', async (request) => tickets.list(request.currentUser, listQuerySchema.parse(request.query)));
+  app.get('/', async (request) => {
+    const { groupId, ...query } = listQuerySchema.parse(request.query);
+    const groupIds =
+      groupId === 'mine' ? await tickets.userGroupIds(request.currentUser.id) : groupId ? [groupId] : undefined;
+    return tickets.list(request.currentUser, { ...query, groupIds });
+  });
 
   app.post('/', { preHandler: app.requirePermission('ticket:create') }, async (request, reply) => {
     const schema = isStaff(request.currentUser) ? staffCreateSchema : externalCreateSchema;
@@ -80,12 +84,23 @@ export const ticketRoutes: FastifyPluginAsync<{ prisma: PrismaClient; config: Co
 
   app.get('/:id', async (request) => {
     const { id } = idParams.parse(request.params);
-    return tickets.getVisible(request.currentUser, id);
+    return tickets.getDetail(request.currentUser, id);
+  });
+
+  app.put('/:id/parent', async (request) => {
+    const { id } = idParams.parse(request.params);
+    const { parentId } = z.object({ parentId: z.number().int().positive().nullable() }).strict().parse(request.body);
+    return tickets.setParent(request.currentUser, id, parentId);
   });
 
   app.patch('/:id', async (request) => {
     const { id } = idParams.parse(request.params);
     return tickets.update(request.currentUser, id, updateSchema.parse(request.body));
+  });
+
+  app.post('/:id/route', async (request) => {
+    const { id } = idParams.parse(request.params);
+    return tickets.route(request.currentUser, id);
   });
 
   app.post('/:id/status', async (request) => {

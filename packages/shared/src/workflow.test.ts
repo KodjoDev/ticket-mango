@@ -17,6 +17,12 @@ describe('workflow des tickets', () => {
     }
   });
 
+  it('met en attente du client depuis la qualification et en revient', () => {
+    expect(canTransition('QUALIFYING', 'WAITING_CUSTOMER')).toBe(true);
+    expect(canTransition('WAITING_CUSTOMER', 'QUALIFYING')).toBe(true);
+    expect(canTransition('NEW', 'WAITING_CUSTOMER')).toBe(false);
+  });
+
   it('autorise la réouverture d’un ticket résolu', () => {
     expect(canTransition('RESOLVED', 'QUALIFYING')).toBe(true);
   });

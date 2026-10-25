@@ -2,6 +2,7 @@ import type { OptionField, Prisma, PrismaClient } from '@prisma/client';
 import {
   DEFAULT_LIST_COLUMNS,
   DEFAULT_PRIORITY_MATRIX,
+  DEFAULT_SLA_POLICY,
   DEFAULT_TICKET_FORM,
   IMPACTS,
   LIST_COLUMNS,
@@ -11,6 +12,7 @@ import {
   TICKET_FORM_FIELDS,
   URGENCIES,
   type PriorityMatrix,
+  type SlaPolicy,
 } from '@ticketing/shared';
 import { z } from 'zod';
 import { badRequest } from '../lib/errors';
@@ -19,7 +21,56 @@ export const SETTING_KEYS = {
   priorityMatrix: 'priorityMatrix',
   ticketForm: 'ticketForm',
   listColumns: 'listColumns',
+  slaPolicy: 'slaPolicy',
 } as const;
+
+const hm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Heure attendue au format HH:MM');
+
+export const slaPolicySchema = z
+  .object({
+    targets: z
+      .object(
+        Object.fromEntries(
+          PRIORITIES.map((p) => [
+            p,
+            z
+              .object({
+                firstResponseMinutes: z.number().int().min(1).max(60 * 24 * 60),
+                resolutionMinutes: z.number().int().min(1).max(60 * 24 * 365),
+                calendar: z.enum(['ALWAYS', 'BUSINESS']),
+              })
+              .strict(),
+          ]),
+        ),
+      )
+      .strict(),
+    businessHours: z
+      .object({
+        timeZone: z.string().refine((tz) => {
+          try {
+            new Intl.DateTimeFormat('fr-FR', { timeZone: tz });
+            return true;
+          } catch {
+            return false;
+          }
+        }, 'Fuseau horaire inconnu'),
+        week: z
+          .array(
+            z
+              .object({ start: hm, end: hm })
+              .strict()
+              .refine((d) => d.end > d.start, 'La fermeture doit suivre l’ouverture')
+              .nullable(),
+          )
+          .length(7)
+          .refine((week) => week.some(Boolean), 'Au moins un jour ouvré est nécessaire'),
+        frenchHolidays: z.boolean(),
+        closedDates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).max(366),
+      })
+      .strict(),
+    warningPercent: z.number().int().min(10).max(99),
+  })
+  .strict() as unknown as z.ZodType<SlaPolicy>;
 
 export const priorityMatrixSchema = z.object(
   Object.fromEntries(
@@ -43,6 +94,11 @@ export class ConfigService {
   async priorityMatrix(): Promise<PriorityMatrix> {
     const parsed = priorityMatrixSchema.safeParse(await this.setting(SETTING_KEYS.priorityMatrix));
     return parsed.success ? parsed.data : DEFAULT_PRIORITY_MATRIX;
+  }
+
+  async slaPolicy(): Promise<SlaPolicy> {
+    const parsed = slaPolicySchema.safeParse(await this.setting(SETTING_KEYS.slaPolicy));
+    return parsed.success ? parsed.data : DEFAULT_SLA_POLICY;
   }
 
   async ticketForm() {

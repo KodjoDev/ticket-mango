@@ -16,6 +16,7 @@ async function main() {
 
   const shutdown = async (signal: string) => {
     app.log.info(`${signal} reçu, arrêt en cours`);
+    app.slaMonitor.stop();
     await app.close();
     await prisma.$disconnect();
     process.exit(0);
@@ -24,6 +25,7 @@ async function main() {
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
   await app.listen({ host: config.HOST, port: config.PORT });
+  app.slaMonitor.start(60_000, (err) => app.log.error({ err }, 'Surveillance SLA en échec'));
 }
 
 main().catch((err) => {
