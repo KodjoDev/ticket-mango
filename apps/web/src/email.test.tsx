@@ -162,6 +162,19 @@ describe('administration de la messagerie', () => {
     );
   });
 
+  it('préremplit Gmail et signale une adresse saisie comme serveur', async () => {
+    mockApi({ 'GET /auth/me': admin, 'GET /admin/mailboxes': [] });
+    renderApp('/admin/mail');
+    await userEvent.click(await screen.findByRole('button', { name: 'Nouvelle boîte' }));
+    await userEvent.type(screen.getByLabelText('Adresse'), 'moi@gmail.com');
+    await userEvent.type(screen.getByLabelText('Serveur IMAP'), 'moi@gmail.com');
+    expect(screen.getByText(/L’adresse e-mail va dans « Identifiant »/)).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText('Préréglage'), 'gmail');
+    expect(screen.getByLabelText('Serveur IMAP')).toHaveValue('imap.gmail.com');
+    expect(screen.getByLabelText('Identifiant')).toHaveValue('moi@gmail.com');
+    expect(screen.getByText(/mot de passe d’application/)).toBeInTheDocument();
+  });
+
   it('montre le journal et retraite un message conservé', async () => {
     const calls = mockApi({
       'GET /auth/me': admin,

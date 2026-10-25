@@ -288,6 +288,13 @@ describeDb('messagerie', () => {
       expect(await ctx.prisma.ticket.count()).toBe(2);
     });
 
+    it('refuse une adresse e-mail à la place du nom de serveur', async () => {
+      const admin = await actor(ctx, 'ADMIN');
+      const res = await admin.post('/admin/mailboxes', { name: 'S', address: 's@mango.test', imapHost: 'moi@gmail.com', imapUser: 'moi@gmail.com' });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().issues[0].message).toContain('imap.gmail.com');
+    });
+
     it('enregistre l’erreur de connexion sur la boîte', async () => {
       const admin = await actor(ctx, 'ADMIN');
       const box = (

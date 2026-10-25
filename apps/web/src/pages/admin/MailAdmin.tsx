@@ -9,6 +9,14 @@ import { useAdminMutation } from './common';
 
 const MAILBOXES_KEY = ['admin', 'mailboxes'];
 
+/** Paramètres IMAP des messageries courantes, pour éviter les erreurs de saisie. */
+const IMAP_PRESETS = {
+  gmail: { label: 'Gmail / Google Workspace', host: 'imap.gmail.com', port: 993, help: 'Identifiant : l’adresse complète. Mot de passe : un mot de passe d’application (myaccount.google.com/apppasswords), IMAP activé dans les paramètres Gmail.' },
+  ovh: { label: 'OVHcloud (Zimbra / MX Plan)', host: 'ssl0.ovh.net', port: 993, help: 'Identifiant : l’adresse complète.' },
+  ionos: { label: 'IONOS', host: 'imap.ionos.fr', port: 993, help: 'Identifiant : l’adresse complète.' },
+  outlook: { label: 'Microsoft 365 / Outlook', host: 'outlook.office365.com', port: 993, help: 'Attention : Microsoft a désactivé la connexion IMAP par mot de passe ; utilisez plutôt le webhook (transfert vers un service d’e-mail entrant).' },
+} as const;
+
 const INBOUND_LABELS: Record<InboundStatus, string> = {
   PROCESSED: 'Traité',
   DUPLICATE: 'Doublon',
@@ -34,6 +42,7 @@ function MailboxForm({ mailbox, onDone }: { mailbox?: Mailbox; onDone: () => voi
     defaultGroupId: mailbox?.defaultGroupId ?? null,
   });
   const set = (change: Partial<MailboxInput>) => setF({ ...f, ...change });
+  const [preset, setPreset] = useState<keyof typeof IMAP_PRESETS | ''>('');
   const save = useAdminMutation(
     (input: MailboxInput) => (mailbox ? adminApi.updateMailbox(mailbox.id, input) : adminApi.createMailbox(input)),
     [MAILBOXES_KEY],
@@ -61,6 +70,27 @@ function MailboxForm({ mailbox, onDone }: { mailbox?: Mailbox; onDone: () => voi
         </label>
       </div>
       <h3 className="subhead">Relève IMAP (facultatif si vous utilisez le webhook)</h3>
+      <Field label="Préréglage">
+        <select
+          value=""
+          onChange={(e) => {
+            const p = IMAP_PRESETS[e.target.value as keyof typeof IMAP_PRESETS];
+            if (p) set({ imapHost: p.host, imapPort: p.port, imapSecure: true, imapUser: f.imapUser || f.address });
+            setPreset(e.target.value as keyof typeof IMAP_PRESETS);
+          }}
+        >
+          <option value="">Choisir un fournisseur pour préremplir…</option>
+          {Object.entries(IMAP_PRESETS).map(([k, p]) => (
+            <option key={k} value={k}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+      {preset && <p className="muted small">{IMAP_PRESETS[preset].help}</p>}
+      {f.imapHost?.includes('@') && (
+        <div className="alert">Le serveur IMAP est un nom de machine (ex. imap.gmail.com). L’adresse e-mail va dans « Identifiant ».</div>
+      )}
       <div className="grid-4">
         <Field label="Serveur IMAP">
           <input value={f.imapHost ?? ''} onChange={(e) => set({ imapHost: e.target.value })} placeholder="imap.exemple.fr" />
@@ -74,7 +104,7 @@ function MailboxForm({ mailbox, onDone }: { mailbox?: Mailbox; onDone: () => voi
           />
         </Field>
         <Field label="Identifiant">
-          <input value={f.imapUser ?? ''} autoComplete="off" onChange={(e) => set({ imapUser: e.target.value })} />
+          <input value={f.imapUser ?? ''} autoComplete="off" placeholder="adresse complète" onChange={(e) => set({ imapUser: e.target.value })} />
         </Field>
         <Field label={mailbox?.hasPassword ? 'Mot de passe (laisser vide pour le conserver)' : 'Mot de passe'}>
           <input type="password" autoComplete="new-password" value={f.imapPassword} onChange={(e) => set({ imapPassword: e.target.value })} />

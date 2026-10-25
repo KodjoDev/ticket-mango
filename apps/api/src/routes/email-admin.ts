@@ -14,7 +14,13 @@ const mailboxSchema = z
     name: z.string().trim().min(1).max(100),
     address: z.string().trim().toLowerCase().email(),
     isActive: z.boolean(),
-    imapHost: z.string().trim().max(255).nullable(),
+    imapHost: z
+      .string()
+      .trim()
+      .max(255)
+      .refine((h) => !h.includes('@'), 'Indiquez le nom du serveur (ex. imap.gmail.com), pas une adresse e-mail : celle-ci va dans « Identifiant »')
+      .refine((h) => h === '' || /^[a-z0-9.-]+$/i.test(h), 'Nom de serveur invalide (ex. imap.gmail.com)')
+      .nullable(),
     imapPort: z.number().int().min(1).max(65_535).nullable(),
     imapSecure: z.boolean(),
     imapUser: z.string().trim().max(255).nullable(),
