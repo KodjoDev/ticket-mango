@@ -10,9 +10,11 @@ const configSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('8h'),
   /** Tentatives de connexion autorisées par minute et par adresse IP. */
   LOGIN_RATE_LIMIT: z.coerce.number().int().positive().default(10),
+  /** Cookie de session réservé à HTTPS. Activé par défaut en production. */
+  COOKIE_SECURE: z.enum(['true', 'false']).optional().transform((v) => (v === undefined ? undefined : v === 'true')),
 });
 
-export type Config = z.infer<typeof configSchema>;
+export type Config = Omit<z.infer<typeof configSchema>, 'COOKIE_SECURE'> & { COOKIE_SECURE: boolean };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const result = configSchema.safeParse(env);
@@ -20,5 +22,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     const details = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ');
     throw new Error(`Configuration invalide : ${details}`);
   }
-  return result.data;
+  const { COOKIE_SECURE, ...config } = result.data;
+  return { ...config, COOKIE_SECURE: COOKIE_SECURE ?? config.NODE_ENV === 'production' };
 }

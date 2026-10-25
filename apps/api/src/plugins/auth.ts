@@ -1,8 +1,12 @@
+import fastifyCookie from '@fastify/cookie';
 import fastifyJwt from '@fastify/jwt';
 import type { PrismaClient } from '@prisma/client';
 import { hasPermission, type Permission, type Role } from '@ticketing/shared';
 import type { FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
 import fp from 'fastify-plugin';
+
+/** Cookie de session du navigateur ; les clients d'API peuvent aussi envoyer `Authorization: Bearer`. */
+export const SESSION_COOKIE = 'session';
 
 export interface CurrentUser {
   id: string;
@@ -34,7 +38,12 @@ interface AuthOptions {
 }
 
 export const authPlugin = fp<AuthOptions>(async (app, { prisma, secret, expiresIn }) => {
-  await app.register(fastifyJwt, { secret, sign: { expiresIn } });
+  await app.register(fastifyCookie);
+  await app.register(fastifyJwt, {
+    secret,
+    sign: { expiresIn },
+    cookie: { cookieName: SESSION_COOKIE, signed: false },
+  });
 
   app.decorateRequest('currentUser', null as unknown as CurrentUser);
 

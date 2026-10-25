@@ -21,6 +21,17 @@ describeDb('authentification', () => {
     expect(body.user).toEqual({ id: user.id, email: user.email, name: user.name, role: 'AGENT_N1' });
   });
 
+  it('pose un cookie de session httpOnly qui suffit à s’authentifier', async () => {
+    await createUser(ctx.prisma, 'AGENT_N1', { email: 'agent@test.local' });
+    const res = await loginAs('agent@test.local', PASSWORD);
+    const cookie = res.cookies.find((c) => c.name === 'session');
+    expect(cookie).toMatchObject({ httpOnly: true, sameSite: 'Strict', path: '/' });
+
+    const me = await ctx.app.inject({ method: 'GET', url: '/auth/me', cookies: { session: cookie!.value } });
+    expect(me.statusCode).toBe(200);
+    expect(me.json().email).toBe('agent@test.local');
+  });
+
   it('rejette un mauvais mot de passe ou un compte inconnu avec le même message', async () => {
     await createUser(ctx.prisma, 'AGENT_N1', { email: 'agent@test.local' });
     const wrong = await loginAs('agent@test.local', 'mauvais');

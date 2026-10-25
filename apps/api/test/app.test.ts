@@ -11,7 +11,7 @@ describe('application', () => {
   beforeAll(async () => {
     app = await buildApp({
       prisma,
-      config: { JWT_SECRET: 'x'.repeat(32), JWT_EXPIRES_IN: '1h', LOGIN_RATE_LIMIT: 10 },
+      config: { JWT_SECRET: 'x'.repeat(32), JWT_EXPIRES_IN: '1h', LOGIN_RATE_LIMIT: 10, COOKIE_SECURE: false },
     });
   });
   afterAll(async () => {
@@ -38,6 +38,12 @@ describe('application', () => {
   it('signale une base indisponible par un 503', async () => {
     const res = await app.inject({ method: 'GET', url: '/health' });
     expect(res.statusCode).toBe(503);
+  });
+
+  it('efface le cookie de session à la déconnexion', async () => {
+    const res = await app.inject({ method: 'POST', url: '/auth/logout' });
+    expect(res.statusCode).toBe(204);
+    expect(res.cookies).toEqual([expect.objectContaining({ name: 'session', value: '' })]);
   });
 
   it('ajoute les en-têtes de sécurité', async () => {

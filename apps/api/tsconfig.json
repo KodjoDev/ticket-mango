@@ -3,7 +3,8 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "dist",
-    "types": ["jest", "node"]
+    "declaration": false,
+    "types": ["vitest/globals", "node"]
   },
-  "include": ["src", "test", "prisma"]
+  "include": ["src", "test", "prisma", "vitest.config.ts"]
 }
