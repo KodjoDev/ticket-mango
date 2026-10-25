@@ -1804,6 +1804,7 @@ h3.subhead {
   color: var(--danger-text);
 }
 
+.badge.inbound-bulk,
 .badge.inbound-spam,
 .badge.inbound-loop,
 .badge.inbound-auto_reply,

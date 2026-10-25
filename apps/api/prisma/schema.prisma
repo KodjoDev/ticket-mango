@@ -43,6 +43,8 @@ enum InboundStatus {
   PROCESSED
   DUPLICATE
   AUTO_REPLY
+  /// Newsletter, notification de réseau social, envoi de masse (en-têtes de liste de diffusion).
+  BULK
   SPAM
   LOOP
   ERROR

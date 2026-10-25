@@ -38,6 +38,7 @@ const settingsSchema = z
     acknowledge: z.boolean(),
     blocklist: z.array(z.string().trim().toLowerCase().regex(/^(@[a-z0-9.-]+\.[a-z]{2,}|[^@\s]+@[a-z0-9.-]+\.[a-z]{2,})$/, 'Adresse ou @domaine attendu')).max(500),
     maxPerSenderPerHour: z.number().int().min(1).max(1000),
+    ignoreBulk: z.boolean().default(true),
   })
   .strict();
 
@@ -131,7 +132,7 @@ export const emailAdminRoutes: FastifyPluginAsync<{
   app.get('/inbound', async (request) => {
     const q = z
       .object({
-        status: z.enum(['PROCESSED', 'DUPLICATE', 'AUTO_REPLY', 'SPAM', 'LOOP', 'ERROR']).optional(),
+        status: z.enum(['PROCESSED', 'DUPLICATE', 'AUTO_REPLY', 'BULK', 'SPAM', 'LOOP', 'ERROR']).optional(),
         page: z.coerce.number().int().min(1).default(1),
       })
       .parse(request.query);

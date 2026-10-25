@@ -201,7 +201,7 @@ describe('administration de la messagerie', () => {
     const calls = mockApi({
       'GET /auth/me': admin,
       'GET /admin/mailboxes': [],
-      'GET /admin/email-settings': { acknowledge: true, blocklist: [], maxPerSenderPerHour: 20 },
+      'GET /admin/email-settings': { acknowledge: true, blocklist: [], maxPerSenderPerHour: 20, ignoreBulk: true },
       'PUT /admin/email-settings': (body) => ({ json: body }),
     });
     renderApp('/admin/mail');
@@ -210,7 +210,7 @@ describe('administration de la messagerie', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: /accusé de réception/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     await waitFor(() =>
-      expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ acknowledge: false, blocklist: ['promo@x.fr', '@spam.io'], maxPerSenderPerHour: 20 }),
+      expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ acknowledge: false, blocklist: ['promo@x.fr', '@spam.io'], maxPerSenderPerHour: 20, ignoreBulk: true }),
     );
   });
 });

@@ -15,8 +15,11 @@ export interface ImapConfig {
 /** Session IMAP minimale : ce dont la relève a besoin (permet de la simuler dans les tests). */
 export interface ImapSession {
   uidValidity: bigint;
-  /** Messages à traiter : non lus au premier passage, puis ceux d'UID supérieur au curseur. */
-  fetchNew(afterUid: number | null): AsyncIterable<{ uid: number; source: Buffer }>;
+  /**
+   * Messages à traiter : au premier passage, les non lus reçus depuis `since` (jamais
+   * l'historique de la boîte) ; ensuite, ceux d'UID supérieur au curseur.
+   */
+  fetchNew(afterUid: number | null, since: Date): AsyncIterable<{ uid: number; source: Buffer; date?: Date }>;
   markSeen(uid: number): Promise<void>;
   close(): Promise<void>;
 }
@@ -37,14 +40,16 @@ export const imapflowConnector: ImapConnector = async (c) => {
   const mailbox = client.mailbox;
   return {
     uidValidity: mailbox ? BigInt(mailbox.uidValidity) : 0n,
-    async *fetchNew(afterUid) {
+    async *fetchNew(afterUid, since) {
       const uids =
         afterUid === null
-          ? ((await client.search({ seen: false }, { uid: true })) || [])
+          ? // SINCE est à la journée près : l'heure exacte est vérifiée ensuite avec la date de réception.
+            ((await client.search({ seen: false, since }, { uid: true })) || [])
           : ((await client.search({ uid: `${afterUid + 1}:*` }, { uid: true })) || []).filter((u) => u > afterUid);
       for (const uid of [...uids].sort((a, b) => a - b)) {
-        const msg = await client.fetchOne(String(uid), { source: true }, { uid: true });
-        if (msg && msg.source) yield { uid, source: msg.source };
+        const msg = await client.fetchOne(String(uid), { source: true, internalDate: true }, { uid: true });
+        const date = msg && msg.internalDate ? new Date(msg.internalDate) : undefined;
+        if (msg && msg.source) yield { uid, source: msg.source, date };
       }
     },
     async markSeen(uid) {
@@ -114,7 +119,13 @@ export class ImapPoller {
       // UIDVALIDITY changé : les UID ne sont plus comparables, on repart des non lus.
       let lastUid = mailbox.uidValidity === session.uidValidity ? mailbox.lastUid : null;
       await this.prisma.mailbox.update({ where: { id: mailbox.id }, data: { uidValidity: session.uidValidity, lastUid } });
-      for await (const { uid, source } of session.fetchNew(lastUid)) {
+      const firstRun = lastUid === null;
+      for await (const { uid, source, date } of session.fetchNew(lastUid, mailbox.createdAt)) {
+        // Premier passage : un message antérieur à la création de la boîte n'est ni importé ni marqué lu.
+        if (firstRun && date && date < mailbox.createdAt) {
+          lastUid = Math.max(lastUid ?? 0, uid);
+          continue;
+        }
         await this.inbound.process(source, mailbox.id);
         await session.markSeen(uid);
         lastUid = Math.max(lastUid ?? 0, uid);

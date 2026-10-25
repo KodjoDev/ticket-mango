@@ -290,7 +290,7 @@ export interface Mailbox {
   lastUid: number | null;
 }
 
-export type InboundStatus = 'PROCESSED' | 'DUPLICATE' | 'AUTO_REPLY' | 'SPAM' | 'LOOP' | 'ERROR';
+export type InboundStatus = 'PROCESSED' | 'DUPLICATE' | 'AUTO_REPLY' | 'BULK' | 'SPAM' | 'LOOP' | 'ERROR';
 
 export interface InboundLog {
   id: string;
@@ -322,6 +322,7 @@ export interface EmailSettings {
   acknowledge: boolean;
   blocklist: string[];
   maxPerSenderPerHour: number;
+  ignoreBulk: boolean;
 }
 
 export interface AuditEntry {

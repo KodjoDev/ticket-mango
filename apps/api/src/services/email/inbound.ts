@@ -8,7 +8,7 @@ import type { IncomingFile } from '../attachments';
 import type { ConfigService } from '../config';
 import type { FileStorage } from '../storage';
 import type { TicketService } from '../tickets';
-import { autoReplyReason, spamReason, type Headers } from './detect';
+import { autoReplyReason, bulkReason, spamReason, type Headers } from './detect';
 import type { OutboundMailer } from './outbound';
 
 /** Taille maximale d'un e-mail brut accepté (pièces jointes de 25 Mo encodées en base64 comprises). */
@@ -24,9 +24,11 @@ export interface EmailSettings {
   blocklist: string[];
   /** Au-delà, les messages d'un même expéditeur sont considérés comme une boucle. */
   maxPerSenderPerHour: number;
+  /** Écarter les newsletters et notifications de services (en-têtes de liste de diffusion). */
+  ignoreBulk: boolean;
 }
 
-export const DEFAULT_EMAIL_SETTINGS: EmailSettings = { acknowledge: true, blocklist: [], maxPerSenderPerHour: 20 };
+export const DEFAULT_EMAIL_SETTINGS: EmailSettings = { acknowledge: true, blocklist: [], maxPerSenderPerHour: 20, ignoreBulk: true };
 
 export interface InboundResult {
   status: InboundStatus;
@@ -113,7 +115,7 @@ export class InboundService {
         data: { status: result.status, reason: result.reason ?? null, ticketId: result.ticketId, commentId: result.commentId },
       });
       // Message écarté : conservé brut pour pouvoir le relire ou le retraiter.
-      if (result.status === 'SPAM') await this.keepRaw(logId, raw);
+      if (result.status === 'SPAM' || result.status === 'BULK') await this.keepRaw(logId, raw);
       return result;
     } catch (err) {
       const reason = err instanceof Error ? err.message.slice(0, 500) : String(err);
@@ -170,6 +172,8 @@ export class InboundService {
     }
     const auto = autoReplyReason(headers, from.address, subject);
     if (auto) return { status: 'AUTO_REPLY', reason: auto };
+    const bulk = settings.ignoreBulk ? bulkReason(headers) : null;
+    if (bulk) return { status: 'BULK', reason: bulk };
     const spam = spamReason(headers, from.address, settings.blocklist);
     if (spam) return { status: 'SPAM', reason: spam };
 

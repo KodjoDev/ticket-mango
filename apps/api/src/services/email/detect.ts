@@ -27,6 +27,16 @@ export function autoReplyReason(headers: Headers, from: string, subject: string)
   return null;
 }
 
+/**
+ * Envoi de masse (newsletter, notification d'un service, liste de diffusion) : un client qui
+ * écrit au support depuis sa messagerie n'envoie jamais ces en-têtes.
+ */
+export function bulkReason(headers: Headers): string | null {
+  if (headers.has('list-unsubscribe')) return 'Newsletter ou notification (List-Unsubscribe)';
+  if (headers.has('list-id')) return 'Liste de diffusion (List-Id)';
+  return null;
+}
+
 /** Spam signalé par les filtres en amont, ou expéditeur bloqué par l'administrateur. */
 export function spamReason(headers: Headers, from: string, blocklist: string[]): string | null {
   if (/^\s*yes\b/i.test(headers.get('x-spam-flag') ?? '')) return 'X-Spam-Flag: YES';

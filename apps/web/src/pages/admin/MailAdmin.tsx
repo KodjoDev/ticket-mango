@@ -21,6 +21,7 @@ const INBOUND_LABELS: Record<InboundStatus, string> = {
   PROCESSED: 'Traité',
   DUPLICATE: 'Doublon',
   AUTO_REPLY: 'Réponse automatique',
+  BULK: 'Newsletter / envoi de masse',
   SPAM: 'Spam / bloqué',
   LOOP: 'Boucle',
   ERROR: 'Erreur',
@@ -283,6 +284,10 @@ function SettingsForm({ saved }: { saved: EmailSettings }) {
       <label className="checkbox">
         <input type="checkbox" checked={s.acknowledge} onChange={(e) => setS({ ...s, acknowledge: e.target.checked })} />
         Envoyer un accusé de réception à la création d'un ticket par e-mail (texte : macro « Accusé de réception »)
+      </label>
+      <label className="checkbox">
+        <input type="checkbox" checked={s.ignoreBulk} onChange={(e) => setS({ ...s, ignoreBulk: e.target.checked })} />
+        Écarter les newsletters et notifications de services (Facebook, outils marketing, listes de diffusion)
       </label>
       <Field label="Expéditeurs bloqués (une adresse ou un @domaine par ligne) — traités comme spam">
         <textarea rows={4} value={blocklist} onChange={(e) => setBlocklist(e.target.value)} placeholder={'promo@exemple.com\n@spam.example'} />

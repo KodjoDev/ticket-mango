@@ -195,6 +195,21 @@ describeDb('messagerie', () => {
       expect(log.rawKey).not.toBeNull();
     });
 
+    it('écarte les newsletters et notifications de services', async () => {
+      const notif = await receive({
+        from: 'notification@facebookmail.com',
+        subject: 'Vous avez 98 notifications',
+        text: 'x',
+        headers: { 'List-Unsubscribe': '<https://facebook.com/unsub>' },
+      });
+      expect(notif).toMatchObject({ status: 'BULK' });
+      expect((await receive({ from: 'liste@asso.fr', subject: 'Compte rendu', text: 'x', headers: { 'List-Id': '<membres.asso.fr>' } })).status).toBe('BULK');
+      expect(await ctx.prisma.ticket.count()).toBe(0);
+
+      await ctx.prisma.setting.create({ data: { key: 'emailSettings', value: { ignoreBulk: false } } });
+      expect((await receive({ from: 'outil@saas.io', subject: 'Alerte', text: 'x', headers: { 'List-Unsubscribe': '<x>' } })).status).toBe('PROCESSED');
+    });
+
     it('coupe une rafale d’un même expéditeur', async () => {
       await ctx.prisma.setting.create({ data: { key: 'emailSettings', value: { maxPerSenderPerHour: 2 } } });
       const statuses = [];
@@ -293,6 +308,32 @@ describeDb('messagerie', () => {
       const res = await admin.post('/admin/mailboxes', { name: 'S', address: 's@mango.test', imapHost: 'moi@gmail.com', imapUser: 'moi@gmail.com' });
       expect(res.statusCode).toBe(400);
       expect(res.json().issues[0].message).toContain('imap.gmail.com');
+    });
+
+    it('n’importe pas, au premier passage, les messages antérieurs à la création de la boîte', async () => {
+      const box = await ctx.prisma.mailbox.create({
+        data: { name: 'S', address: 's@mango.test', webhookToken: 'c'.repeat(64), imapHost: 'imap.x', imapUser: 'u', imapPasswordEnc: new SecretBox(undefined, JWT_SECRET).encrypt('p') },
+      });
+      const seen: number[] = [];
+      let sinceAsked: Date | undefined;
+      const old = new Date(box.createdAt.getTime() - 86_400_000);
+      const session: ImapSession = {
+        uidValidity: 1n,
+        async *fetchNew(_after, since) {
+          sinceAsked = since;
+          yield { uid: 3, source: await raw({ from: 'ancien@client.fr', subject: 'Vieux', text: 'x' }), date: old };
+          yield { uid: 4, source: await raw({ from: 'nouveau@client.fr', subject: 'Nouveau', text: 'x' }), date: new Date() };
+        },
+        markSeen: async (uid) => void seen.push(uid),
+        close: async () => undefined,
+      };
+      const poller = new ImapPoller(ctx.prisma, ctx.app.inbound, new SecretBox(undefined, JWT_SECRET), async () => session);
+      expect(await poller.pollMailbox(box)).toEqual({ processed: 1 });
+      expect(sinceAsked).toEqual(box.createdAt);
+      // L'ancien message reste non lu dans la boîte, mais le curseur le dépasse.
+      expect(seen).toEqual([4]);
+      expect((await ctx.prisma.mailbox.findUniqueOrThrow({ where: { id: box.id } })).lastUid).toBe(4);
+      expect((await ctx.prisma.ticket.findMany()).map((t) => t.subject)).toEqual(['Nouveau']);
     });
 
     it('enregistre l’erreur de connexion sur la boîte', async () => {
