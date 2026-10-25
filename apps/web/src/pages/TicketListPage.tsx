@@ -53,9 +53,14 @@ const CELLS: Record<ListColumn, (t: Ticket, config: ConfigHelpers) => ReactNode>
 /** Repères sous le sujet : réponse client en attente, ticket référent ou rattaché. */
 export function TicketMarkers({ ticket }: { ticket: Ticket }) {
   const awaiting = ticket.awaitingAgent && isOpenStatus(ticket.status);
-  if (!awaiting && !ticket.childCount && !ticket.parent) return null;
+  if (!awaiting && !ticket.childCount && !ticket.parent && ticket.channel !== 'EMAIL') return null;
   return (
     <div className="markers">
+      {ticket.channel === 'EMAIL' && (
+        <span className="muted small" title="Arrivé par e-mail">
+          ✉
+        </span>
+      )}
       {awaiting && (
         <span className="badge awaiting-badge" title={`Dernier message du demandeur : ${formatDate(ticket.lastRequesterReplyAt)}`}>
           Réponse client en attente

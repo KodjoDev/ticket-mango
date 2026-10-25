@@ -151,7 +151,7 @@ export const emailAdminRoutes: FastifyPluginAsync<{
   });
 
   app.get('/outbound', async (request) => {
-    const { status } = z.object({ status: z.enum(['PENDING', 'SENT', 'FAILED']).optional() }).parse(request.query);
+    const { status } = z.object({ status: z.enum(['PENDING', 'SENT', 'FAILED', 'SKIPPED']).optional() }).parse(request.query);
     return prisma.outboundEmail.findMany({
       where: status ? { status } : {},
       orderBy: { createdAt: 'desc' },

@@ -18,6 +18,12 @@ import type {
   Comment,
   FieldOption,
   AdminGroup,
+  AttachmentRef,
+  EmailSettings,
+  InboundLog,
+  InboundStatus,
+  Mailbox,
+  OutboundLog,
   Macro,
   ManagedUser,
   Notification,
@@ -37,6 +43,24 @@ import type {
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
 
+/** Lien de téléchargement d'une pièce jointe (même origine : le cookie de session suit). */
+export const attachmentUrl = (id: string) => `${BASE_URL}/attachments/${id}`;
+
+export interface MailboxInput {
+  name: string;
+  address: string;
+  isActive: boolean;
+  imapHost: string | null;
+  imapPort: number | null;
+  imapSecure: boolean;
+  imapUser: string | null;
+  /** Vide : mot de passe inchangé. */
+  imapPassword: string;
+  imapFolder: string;
+  defaultType: string | null;
+  defaultGroupId: string | null;
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -55,12 +79,14 @@ export function setUnauthorizedHandler(handler: () => void) {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  // Un FormData (pièces jointes) part tel quel : le navigateur pose lui-même l'en-tête multipart.
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
     // La session voyage dans un cookie httpOnly posé par l'API.
     credentials: 'same-origin',
-    headers: body === undefined ? undefined : { 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: body === undefined || isForm ? undefined : { 'content-type': 'application/json' },
+    body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
   });
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => null);
@@ -99,8 +125,20 @@ export const api = {
   transition: (id: number, status: TicketStatus) => request<Ticket>('POST', `/tickets/${id}/status`, { status }),
 
   comments: (id: number) => request<Comment[]>('GET', `/tickets/${id}/comments`),
-  addComment: (id: number, body: string, isInternal: boolean) =>
-    request<Comment>('POST', `/tickets/${id}/comments`, { body, isInternal }),
+  addComment: (id: number, body: string, isInternal: boolean, files: File[] = []) => {
+    if (files.length === 0) return request<Comment>('POST', `/tickets/${id}/comments`, { body, isInternal });
+    const form = new FormData();
+    form.set('body', body);
+    form.set('isInternal', String(isInternal));
+    for (const f of files) form.append('file', f, f.name);
+    return request<Comment>('POST', `/tickets/${id}/comments`, form);
+  },
+  addAttachments: (id: number, files: File[]) => {
+    const form = new FormData();
+    for (const f of files) form.append('file', f, f.name);
+    return request<AttachmentRef[]>('POST', `/tickets/${id}/attachments`, form);
+  },
+  merge: (id: number, targetId: number) => request<Ticket>('POST', `/tickets/${id}/merge`, { targetId }),
 
   audit: (id: number) => request<AuditEntry[]>('GET', `/tickets/${id}/audit`),
 
@@ -187,6 +225,21 @@ export const adminApi = {
     request<RoutingRule>('PATCH', `/admin/routing-rules/${id}`, input),
   reorderRules: (ids: string[]) => request<RoutingRule[]>('PUT', '/admin/routing-rules/order', { ids }),
   deleteRule: (id: string) => request<void>('DELETE', `/admin/routing-rules/${id}`),
+
+  mailboxes: () => request<Mailbox[]>('GET', '/admin/mailboxes'),
+  createMailbox: (input: MailboxInput) => request<Mailbox>('POST', '/admin/mailboxes', input),
+  updateMailbox: (id: string, input: Partial<MailboxInput>) => request<Mailbox>('PATCH', `/admin/mailboxes/${id}`, input),
+  deleteMailbox: (id: string) => request<void>('DELETE', `/admin/mailboxes/${id}`),
+  testMailbox: (id: string) => request<{ ok: boolean; error?: string }>('POST', `/admin/mailboxes/${id}/test`),
+  pollMailbox: (id: string) => request<{ processed: number }>('POST', `/admin/mailboxes/${id}/poll`),
+  regenerateMailboxToken: (id: string) => request<Mailbox>('POST', `/admin/mailboxes/${id}/regenerate-token`),
+  inboundLog: (status?: InboundStatus, page = 1) =>
+    request<Page<InboundLog>>('GET', `/admin/inbound?page=${page}${status ? `&status=${status}` : ''}`),
+  retryInbound: (id: string) => request<{ status: InboundStatus; ticketId?: number }>('POST', `/admin/inbound/${id}/retry`),
+  outboundLog: (status?: OutboundLog['status']) => request<OutboundLog[]>('GET', `/admin/outbound${status ? `?status=${status}` : ''}`),
+  retryOutbound: (id: string) => request<{ ok: boolean }>('POST', `/admin/outbound/${id}/retry`),
+  emailSettings: () => request<EmailSettings>('GET', '/admin/email-settings'),
+  saveEmailSettings: (s: EmailSettings) => request<EmailSettings>('PUT', '/admin/email-settings', s),
 
   saveSlaPolicy: (policy: SlaPolicy) => request<SlaPolicy>('PUT', '/admin/sla-policy', policy),
 };

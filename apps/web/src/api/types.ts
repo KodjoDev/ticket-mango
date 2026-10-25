@@ -58,6 +58,12 @@ export interface Ticket {
   slaState: SlaState;
   slaDueAt: string | null;
   parent: { id: number; subject: string; status: TicketStatus } | null;
+  channel: 'WEB' | 'EMAIL';
+  mailboxId: string | null;
+  /** Doublon fusionné : ticket qui le remplace. */
+  mergedInto: { id: number; subject: string } | null;
+  /** Pièces jointes de la demande initiale. */
+  attachments: AttachmentRef[];
   childCount: number;
   /** Le demandeur s'est exprimé après la dernière réponse publique du support. */
   awaitingAgent: boolean;
@@ -237,12 +243,85 @@ export interface Page<T> {
   pageSize: number;
 }
 
+export interface AttachmentRef {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  createdAt: string;
+}
+
+export interface OutboundStatusRef {
+  /** SKIPPED : aucun SMTP configuré, message seulement journalisé. */
+  status: 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED';
+  toAddress: string;
+  sentAt: string | null;
+  lastError: string | null;
+}
+
 export interface Comment {
   id: string;
   body: string;
   isInternal: boolean;
+  channel: 'WEB' | 'EMAIL';
   createdAt: string;
   author: { id: string; name: string };
+  attachments: AttachmentRef[];
+  /** État de l'envoi par e-mail (visible du support). */
+  outbound?: OutboundStatusRef[];
+}
+
+export interface Mailbox {
+  id: string;
+  name: string;
+  address: string;
+  isActive: boolean;
+  imapHost: string | null;
+  imapPort: number | null;
+  imapSecure: boolean;
+  imapUser: string | null;
+  imapFolder: string;
+  hasPassword: boolean;
+  defaultType: string | null;
+  defaultGroupId: string | null;
+  webhookUrl: string;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  lastUid: number | null;
+}
+
+export type InboundStatus = 'PROCESSED' | 'DUPLICATE' | 'AUTO_REPLY' | 'SPAM' | 'LOOP' | 'ERROR';
+
+export interface InboundLog {
+  id: string;
+  messageId: string;
+  fromAddress: string;
+  subject: string;
+  status: InboundStatus;
+  reason: string | null;
+  ticketId: number | null;
+  receivedAt: string;
+  size: number;
+  canRetry: boolean;
+  mailbox: { address: string } | null;
+}
+
+export interface OutboundLog {
+  id: string;
+  ticketId: number;
+  toAddress: string;
+  subject: string;
+  status: OutboundStatusRef['status'];
+  attempts: number;
+  lastError: string | null;
+  sentAt: string | null;
+  createdAt: string;
+}
+
+export interface EmailSettings {
+  acknowledge: boolean;
+  blocklist: string[];
+  maxPerSenderPerHour: number;
 }
 
 export interface AuditEntry {

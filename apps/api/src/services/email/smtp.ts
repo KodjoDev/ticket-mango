@@ -3,6 +3,7 @@ import type { MailMessage, MailTransport } from './outbound';
 
 /** Envoi SMTP (SMTP_URL, ex. smtp://utilisateur:motdepasse@smtp.exemple.fr:587). */
 export class SmtpTransport implements MailTransport {
+  readonly delivers = true;
   private readonly transporter;
 
   constructor(url: string) {
@@ -26,6 +27,8 @@ export class SmtpTransport implements MailTransport {
 
 /** Sans SMTP configuré : les e-mails sont journalisés au lieu d'être envoyés. */
 export class LogTransport implements MailTransport {
+  readonly delivers = false;
+
   constructor(private readonly log: (msg: string) => void) {}
 
   async send(m: MailMessage) {
@@ -35,6 +38,7 @@ export class LogTransport implements MailTransport {
 
 /** Capture en mémoire, pour les tests. */
 export class MemoryTransport implements MailTransport {
+  readonly delivers = true;
   readonly sent: MailMessage[] = [];
   failNext = 0;
 

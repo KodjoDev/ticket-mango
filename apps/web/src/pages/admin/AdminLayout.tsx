@@ -4,6 +4,7 @@ import { useAuth } from '../../auth/AuthContext';
 
 export const ADMIN_SECTIONS: { path: string; label: string; permission: Permission }[] = [
   { path: 'users', label: 'Utilisateurs', permission: 'user:manage' },
+  { path: 'mail', label: 'Messagerie', permission: 'settings:manage' },
   { path: 'groups', label: 'Groupes', permission: 'settings:manage' },
   { path: 'routing', label: 'Routage', permission: 'settings:manage' },
   { path: 'sla', label: 'SLA', permission: 'settings:manage' },

@@ -5,6 +5,7 @@ import type { Agent, Ticket, TicketDetail, TicketInput } from '../api/types';
 import { useAuth, useCurrentUser } from '../auth/AuthContext';
 import { useConfig } from '../config/ConfigContext';
 import { QualificationFields } from './QualificationFields';
+import { MergeCard } from './Merge';
 import { ReferentCard } from './Referent';
 import { SlaCard } from './Sla';
 import { Avatar, ErrorMessage, Field, formatDate, options, PriorityBadge, StatusBadge } from './ui';
@@ -168,6 +169,7 @@ export function TicketSidebar({ ticket, agents }: { ticket: TicketDetail; agents
       </section>
 
       <ReferentCard ticket={ticket} />
+      <MergeCard ticket={ticket} />
 
       <section className="card">
         <h2>Dates</h2>

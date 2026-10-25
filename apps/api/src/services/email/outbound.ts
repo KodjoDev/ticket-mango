@@ -21,6 +21,8 @@ export interface MailMessage {
 
 /** Transport d'envoi : SMTP (nodemailer) en production, capture en mémoire dans les tests. */
 export interface MailTransport {
+  /** Faux si le message n'a pas réellement quitté l'application (aucun SMTP configuré). */
+  readonly delivers: boolean;
   send(message: MailMessage): Promise<void>;
 }
 
@@ -182,7 +184,9 @@ export class OutboundMailer {
         });
         await this.d.prisma.outboundEmail.update({
           where: { id: email.id },
-          data: { status: 'SENT', sentAt: new Date(), attempts: { increment: 1 }, lastError: null },
+          data: this.d.transport.delivers
+            ? { status: 'SENT', sentAt: new Date(), attempts: { increment: 1 }, lastError: null }
+            : { status: 'SKIPPED', attempts: { increment: 1 }, lastError: 'SMTP non configuré : e-mail journalisé, non envoyé' },
         });
         sent++;
       } catch (err) {

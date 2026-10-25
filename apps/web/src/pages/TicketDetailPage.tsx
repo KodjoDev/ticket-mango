@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { renderMacro, SYSTEM_MACRO_KEYS } from '@ticketing/shared';
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -8,6 +8,7 @@ import { useAuth, useCurrentUser } from '../auth/AuthContext';
 import { AuditTrail } from '../components/AuditTrail';
 import { Conversation, type Draft } from '../components/Conversation';
 import { MeetingsCard } from '../components/Meetings';
+import { AttachmentList, FilePicker } from '../components/Attachments';
 import { TagList } from '../components/tags';
 import { TicketSidebar } from '../components/TicketSidebar';
 import { ErrorMessage, formatDate, PriorityBadge, Spinner, StatusBadge } from '../components/ui';
@@ -70,6 +71,15 @@ export function TicketDetailPage() {
       <Link to="/tickets" className="back">
         ← Tickets
       </Link>
+      {t.mergedInto && (
+        <div className="merged-banner" role="status">
+          Ce ticket a été fusionné dans le{' '}
+          <Link to={`/tickets/${t.mergedInto.id}`}>
+            #{t.mergedInto.id} {t.mergedInto.subject}
+          </Link>
+          .
+        </div>
+      )}
       <header className="ticket-header">
         <h1>
           <span className="muted">#{t.id}</span> {t.subject}
@@ -80,6 +90,7 @@ export function TicketDetailPage() {
           <span>{config.label('TYPE', t.type)}</span>
           {t.component && <span>· {config.label('COMPONENT', t.component)}</span>}
           {t.environment && <span>· {config.label('ENVIRONMENT', t.environment)}</span>}
+          {t.channel === 'EMAIL' && <span className="badge channel-badge">✉ E-mail</span>}
           <TagList tags={t.tags} />
           {t.awaitingAgent && t.status !== 'RESOLVED' && t.status !== 'CLOSED' && (
             <span className="badge awaiting-badge">Réponse client en attente</span>
@@ -96,6 +107,8 @@ export function TicketDetailPage() {
           <section className="card">
             <h2>Description</h2>
             <p className="prewrap">{t.description}</p>
+            <AttachmentList attachments={t.attachments} />
+            {t.status !== 'CLOSED' && can('comment:create') && <AddAttachments ticketId={t.id} />}
           </section>
           <ErrorMessage error={comments.error} />
           {meetings.data && <MeetingsCard ticket={t} meetings={meetings.data} onCreated={(m) => void prepareInvitation(m)} />}
@@ -104,5 +117,32 @@ export function TicketDetailPage() {
         </div>
       </div>
     </>
+  );
+}
+
+/** Ajout de pièces jointes à la demande initiale. */
+function AddAttachments({ ticketId }: { ticketId: number }) {
+  const queryClient = useQueryClient();
+  const [files, setFiles] = useState<File[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const upload = useMutation({
+    mutationFn: () => api.addAttachments(ticketId, files),
+    onSuccess: () => {
+      setFiles([]);
+      setError(null);
+      void queryClient.invalidateQueries({ queryKey: ['ticket', ticketId] });
+    },
+  });
+  return (
+    <div className="add-attachments">
+      <ErrorMessage error={upload.error} />
+      {error && <div className="alert">{error}</div>}
+      <FilePicker files={files} onChange={setFiles} onTooLarge={(n) => setError(`Trop volumineux (25 Mo maximum) : ${n.join(', ')}`)} />
+      {files.length > 0 && (
+        <button type="button" className="primary" disabled={upload.isPending} onClick={() => upload.mutate()}>
+          Ajouter {files.length} fichier(s)
+        </button>
+      )}
+    </div>
   );
 }

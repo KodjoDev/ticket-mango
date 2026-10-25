@@ -64,7 +64,18 @@ export function mockApi(routes: Record<string, Handler | object>) {
       const url = new URL(input, 'http://localhost');
       const method = init.method ?? 'GET';
       const path = url.pathname.replace(/^\/api/, '');
-      const body = init.body ? JSON.parse(String(init.body)) : undefined;
+      // Formulaire (pièces jointes) : champs texte et noms des fichiers, pour les vérifications.
+      const body =
+        init.body instanceof FormData
+          ? Object.fromEntries(
+              [...new Set(init.body.keys())].map((k) => {
+                const values = (init.body as FormData).getAll(k).map((v) => (typeof v === 'string' ? v : (v as File).name));
+                return [k, values.length > 1 ? values : values[0]];
+              }),
+            )
+          : init.body
+            ? JSON.parse(String(init.body))
+            : undefined;
       calls.push({ method, path, search: url.search, body });
       const route = routes[`${method} ${path}`] ?? DEFAULT_ROUTES[`${method} ${path}`];
       if (!route) return new Response(JSON.stringify({ message: 'Introuvable' }), { status: 404 });
@@ -120,6 +131,10 @@ export function makeTicket(overrides: Partial<TicketDetail> = {}): TicketDetail 
     slaState: 'OK',
     slaDueAt: null,
     parent: null,
+    channel: 'WEB',
+    mailboxId: null,
+    mergedInto: null,
+    attachments: [],
     childCount: 0,
     children: [],
     awaitingAgent: false,

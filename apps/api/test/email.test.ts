@@ -1,6 +1,9 @@
 import MailComposer from 'nodemailer/lib/mail-composer';
 import { ImapPoller, type ImapSession } from '../src/services/email/imap';
 import { SecretBox } from '../src/lib/secrets';
+import { AttachmentService } from '../src/services/attachments';
+import { OutboundMailer } from '../src/services/email/outbound';
+import { LogTransport } from '../src/services/email/smtp';
 import { actor, describeDb, PASSWORD, resetDb, setup, teardown, type TestContext } from './helpers';
 
 type Mail = ConstructorParameters<typeof MailComposer>[0];
@@ -296,6 +299,24 @@ describeDb('messagerie', () => {
       await poller.pollMailbox(await ctx.prisma.mailbox.findUniqueOrThrow({ where: { id: box.id } }));
       expect((await ctx.prisma.mailbox.findUniqueOrThrow({ where: { id: box.id } })).lastError).toBe('Authentification refusée');
     });
+  });
+
+  it('signale un e-mail non envoyé faute de SMTP, sans prétendre l’avoir envoyé', async () => {
+    const logged: string[] = [];
+    await mailbox();
+    await receive({ from: 'a@client.fr', subject: 'Sans SMTP', text: 'x' });
+    const mailer = new OutboundMailer({
+      prisma: ctx.prisma,
+      attachments: new AttachmentService(ctx.prisma, ctx.storage),
+      transport: new LogTransport((m) => logged.push(m)),
+      defaultFrom: null,
+      fromName: 'Support',
+      domain: 'mango.test',
+      publicAppUrl: 'http://localhost',
+    });
+    await mailer.processPending();
+    expect(await ctx.prisma.outboundEmail.findFirstOrThrow()).toMatchObject({ status: 'SKIPPED', sentAt: null });
+    expect(logged[0]).toContain('SMTP_URL absent');
   });
 
   describe('envoi : reprise sur échec', () => {

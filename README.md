@@ -66,6 +66,12 @@ Toutes les routes, sauf `/health`, `/auth/login` et `/auth/logout`, exigent une 
 | `GET` / `POST` | `/public/bookings/:token` | Page publique de réservation (sans session) |
 | `GET` | `/developers` | Développeurs invitables |
 | `POST` | `/tickets/:id/route` | Réapplique les règles de routage |
+| `POST` | `/tickets/:id/comments` | JSON, ou multipart (`body`, `isInternal`, fichiers) pour joindre des pièces |
+| `POST` | `/tickets/:id/attachments` | Pièces jointes de la demande initiale (multipart) |
+| `GET` | `/attachments/:id` | Téléchargement d'une pièce jointe |
+| `POST` | `/tickets/:id/merge` | Fusionne le ticket (doublon) dans `targetId` |
+| `POST` | `/inbound/email/:token` | Réception d'un e-mail par webhook |
+| `…` | `/admin/mailboxes`, `/admin/inbound`, `/admin/outbound`, `/admin/email-settings` | Administration de la messagerie |
 | `PUT` | `/tickets/:id/parent` | Rattache à un ticket référent (`parentId`, ou `null` pour détacher) |
 | `GET` / `POST` | `/notifications`, `/notifications/:id/read`, `/notifications/read-all` | Notifications de l'utilisateur |
 | `…` | `/admin/groups`, `/admin/routing-rules`, `/admin/sla-policy` | Administration des groupes, du routage et des SLA |
@@ -101,6 +107,17 @@ Chaque action d'administration est inscrite au journal d'audit.
 - **Alertes** : une tâche de surveillance (toutes les minutes, sous verrou PostgreSQL pour ne tourner que sur une instance) met à jour l'état SLA et notifie une seule fois, à risque puis dépassé, l'agent assigné et le responsable du groupe (ou les membres du groupe sans agent assigné).
 - **Ticket référent** : un ticket peut être rattaché à un ticket référent (un niveau, sans boucle). Le référent liste ses tickets liés.
 - **Réponse client en attente** : un ticket ouvert dont le demandeur s'est exprimé après la dernière réponse publique du support est surligné dans la liste et dispose d'un filtre et d'une vue.
+
+### Messagerie (e-mail → ticket)
+
+- **Boîtes de réception** (Administration → Messagerie) : une par adresse (support@, incidents@, bugs@…), avec un type et un groupe par défaut. Deux modes de réception, cumulables :
+  - **relève IMAP** toutes les minutes. Le mot de passe est chiffré en base (AES-256-GCM, clé `SECRET_KEY`) ;
+  - **webhook** `POST /inbound/email/<jeton>` : MIME brut (`message/rfc822`), ou formulaire multipart avec le message brut dans le champ `email` (SendGrid, option « Send raw ») ou `body-mime` (Mailgun).
+- **Fil de discussion** : une réponse est rattachée par ses en-têtes `In-Reply-To` / `References`, sinon par `[TICKET #n]` dans le sujet. Seuls le demandeur et le support peuvent écrire ainsi dans un ticket existant. Une réponse à un ticket clôturé ouvre un nouveau ticket qui y renvoie.
+- **Filtrage** : réponses automatiques (absence, rebonds, `Auto-Submitted`, `Precedence`), spam signalé en amont, liste de blocage, boucles (nos propres adresses, rafales). Tout est consigné dans le journal ; les messages écartés à tort se retraitent.
+- **Envoi** : les réponses publiques du support et l'accusé de réception (macro système) partent par SMTP (`SMTP_URL`). Une file d'envoi réessaie après 1, 5, 15 et 60 minutes. Sans `SMTP_URL`, les e-mails sont seulement journalisés et affichés « non envoyé ». En développement, `docker compose up mailpit` capture les e-mails sur http://localhost:8025 (`SMTP_URL=smtp://localhost:1025`).
+- **Pièces jointes** : 25 Mo par fichier, reçues par e-mail ou ajoutées dans l'interface. Elles sont stockées sur disque (`STORAGE_DIR`), derrière une interface prête pour un stockage S3. Le téléchargement est forcé, sauf pour les images et les PDF ; les pièces des notes internes sont invisibles pour le demandeur.
+- **Fusion de doublons** : le doublon est clôturé et son contenu recopié en note interne ; les e-mails qui lui répondent arrivent dans le ticket conservé.
 
 ### Règles métier
 
