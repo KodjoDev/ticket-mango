@@ -31,7 +31,10 @@ export function LoginPage() {
   return (
     <div className="login">
       <form className="card login-card" onSubmit={onSubmit}>
-        <h1>Ticket Mango</h1>
+        <h1>
+          <span className="brand-mark" aria-hidden="true">M</span>
+          Ticket Mango
+        </h1>
         <p className="muted">Connectez-vous pour accéder au support.</p>
         <ErrorMessage error={error} />
         <Field label="Email">

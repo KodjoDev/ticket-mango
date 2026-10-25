@@ -19,7 +19,7 @@ import { Link, useSearchParams } from 'react-router';
 import { api } from '../api/client';
 import type { TicketFilters } from '../api/types';
 import { useAuth, useCurrentUser } from '../auth/AuthContext';
-import { ErrorMessage, formatDate, options, PriorityBadge, Spinner, StatusBadge } from '../components/ui';
+import { Avatar, ErrorMessage, formatDate, options, PriorityBadge, Spinner, StatusBadge } from '../components/ui';
 
 const PAGE_SIZE = 25;
 const OPEN_STATUSES = TICKET_STATUSES.filter(isOpenStatus);
@@ -165,7 +165,16 @@ export function TicketListPage() {
                     </td>
                     <td>{TICKET_TYPE_LABELS[t.type]}</td>
                     <td>{t.component ? COMPONENT_LABELS[t.component] : '—'}</td>
-                    <td>{t.assignee?.name ?? <span className="muted">Non assigné</span>}</td>
+                    <td>
+                      {t.assignee ? (
+                        <span className="assignee-cell">
+                          <Avatar name={t.assignee.name} size="sm" />
+                          {t.assignee.name}
+                        </span>
+                      ) : (
+                        <span className="muted">Non assigné</span>
+                      )}
+                    </td>
                     <td className="nowrap">{formatDate(t.createdAt)}</td>
                   </tr>
                 ))}

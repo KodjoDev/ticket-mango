@@ -120,9 +120,26 @@ describe('détail d’un ticket', () => {
 
     expect(await screen.findByRole('heading', { name: /Erreur 500 au login/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Clôturer' })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Note interne')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Note interne' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Urgence')).toBeDisabled();
     expect(screen.queryByText('Historique')).not.toBeInTheDocument();
+  });
+
+  it('envoie une note interne depuis l’onglet dédié', async () => {
+    const calls = mockApi({
+      ...detailRoutes(),
+      'POST /tickets/42/comments': (body) => ({ status: 201, json: { id: 'c2', ...(body as object) } }),
+    });
+    renderApp('/tickets/42');
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Note interne' }));
+    await userEvent.type(screen.getByLabelText('Votre message'), 'À vérifier côté cache');
+    await userEvent.click(screen.getByRole('button', { name: 'Ajouter la note' }));
+    await waitFor(() =>
+      expect(calls).toContainEqual(
+        expect.objectContaining({ method: 'POST', body: { body: 'À vérifier côté cache', isInternal: true } }),
+      ),
+    );
   });
 
   it('distingue visuellement les notes internes', async () => {

@@ -19,7 +19,7 @@ import {
 import { api, ApiError } from '../api/client';
 import type { Agent, Ticket, TicketInput } from '../api/types';
 import { useAuth, useCurrentUser } from '../auth/AuthContext';
-import { ErrorMessage, Field, formatDate, options, PriorityBadge, StatusBadge } from './ui';
+import { Avatar, ErrorMessage, Field, formatDate, options, PriorityBadge, StatusBadge } from './ui';
 
 /** Libellé du bouton selon la transition (réouverture, renvoi en arrière…). */
 function transitionLabel(from: TicketStatus, to: TicketStatus): string {
@@ -57,6 +57,17 @@ export function TicketSidebar({ ticket, agents }: { ticket: Ticket; agents: Agen
 
   return (
     <aside className="ticket-side">
+      <section className="card">
+        <h2>Demandeur</h2>
+        <div className="requester">
+          <Avatar name={ticket.requester.name} />
+          <div>
+            <strong>{ticket.requester.name}</strong>
+            <div className="muted small">{ticket.requester.email}</div>
+          </div>
+        </div>
+      </section>
+
       <section className="card">
         <h2>Statut</h2>
         <StatusBadge status={ticket.status} />

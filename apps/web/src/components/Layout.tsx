@@ -1,7 +1,7 @@
 import { ROLE_LABELS } from '@ticketing/shared';
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
-import { Spinner } from './ui';
+import { Avatar, Spinner } from './ui';
 
 /** Garde des routes authentifiées et coque de l'application. */
 export function Layout() {
@@ -14,7 +14,10 @@ export function Layout() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="brand">Ticket Mango</div>
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">M</span>
+          Ticket Mango
+        </div>
         <nav>
           <NavLink to="/tickets" end>
             Tickets
@@ -22,13 +25,14 @@ export function Layout() {
           {can('ticket:create') && <NavLink to="/tickets/new">Nouveau ticket</NavLink>}
         </nav>
         <div className="sidebar-user">
-          <div>
+          <Avatar name={user.name} />
+          <div className="who">
             <strong>{user.name}</strong>
             <div className="muted small">{ROLE_LABELS[user.role]}</div>
+            <button type="button" className="link" onClick={() => void logout()}>
+              Se déconnecter
+            </button>
           </div>
-          <button type="button" className="link" onClick={() => void logout()}>
-            Se déconnecter
-          </button>
         </div>
       </aside>
       <main className="content">

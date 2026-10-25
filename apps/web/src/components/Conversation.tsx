@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { api } from '../api/client';
 import type { Comment } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
-import { ErrorMessage, formatDate } from './ui';
+import { Avatar, ErrorMessage, formatDate } from './ui';
 
 interface Props {
   ticketId: number;
@@ -40,19 +40,32 @@ export function Conversation({ ticketId, comments, readOnly }: Props) {
         <ol className="comments">
           {comments.map((c) => (
             <li key={c.id} className={c.isInternal ? 'comment internal' : 'comment'}>
-              <div className="comment-meta">
-                <strong>{c.author.name}</strong>
-                {c.isInternal && <span className="badge internal-badge">Note interne</span>}
-                <span className="muted small">{formatDate(c.createdAt)}</span>
+              <Avatar name={c.author.name} />
+              <div className="comment-body">
+                <div className="comment-meta">
+                  <strong>{c.author.name}</strong>
+                  {c.isInternal && <span className="badge internal-badge">Note interne</span>}
+                  <span className="muted small">{formatDate(c.createdAt)}</span>
+                </div>
+                <p className="prewrap">{c.body}</p>
               </div>
-              <p className="prewrap">{c.body}</p>
             </li>
           ))}
         </ol>
       )}
 
       {!readOnly && can('comment:create') && (
-        <form className="composer" onSubmit={onSubmit}>
+        <form className={isInternal ? 'composer internal' : 'composer'} onSubmit={onSubmit}>
+          {can('comment:internal') && (
+            <div className="composer-tabs" role="tablist" aria-label="Type de message">
+              <button type="button" role="tab" aria-selected={!isInternal} onClick={() => setIsInternal(false)}>
+                Réponse publique
+              </button>
+              <button type="button" role="tab" aria-selected={isInternal} onClick={() => setIsInternal(true)}>
+                Note interne
+              </button>
+            </div>
+          )}
           <ErrorMessage error={add.error} />
           <textarea
             aria-label="Votre message"
@@ -60,15 +73,8 @@ export function Conversation({ ticketId, comments, readOnly }: Props) {
             rows={4}
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            className={isInternal ? 'internal' : undefined}
           />
           <div className="actions">
-            {can('comment:internal') && (
-              <label className="checkbox">
-                <input type="checkbox" checked={isInternal} onChange={(e) => setIsInternal(e.target.checked)} />
-                Note interne
-              </label>
-            )}
             <button type="submit" className="primary" disabled={add.isPending || !body.trim()}>
               {isInternal ? 'Ajouter la note' : 'Envoyer'}
             </button>

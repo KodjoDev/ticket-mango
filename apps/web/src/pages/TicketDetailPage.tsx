@@ -62,6 +62,7 @@ export function TicketDetailPage() {
       </header>
 
       <div className="ticket-layout">
+        <TicketSidebar ticket={t} agents={agents.data ?? []} />
         <div className="ticket-main">
           <section className="card">
             <h2>Description</h2>
@@ -71,7 +72,6 @@ export function TicketDetailPage() {
           {comments.data && <Conversation ticketId={t.id} comments={comments.data} readOnly={t.status === 'CLOSED'} />}
           {audit.data && <AuditTrail entries={audit.data} names={names} />}
         </div>
-        <TicketSidebar ticket={t} agents={agents.data ?? []} />
       </div>
     </>
   );
