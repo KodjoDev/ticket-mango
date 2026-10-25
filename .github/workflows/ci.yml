@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # Fastify 5 exige Node.js 20 ou plus.
+        node-version: [20.x, 22.x]
+
+    # Base PostgreSQL éphémère pour les tests d'intégration de l'API.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ticketing
+          POSTGRES_PASSWORD: ticketing
+          POSTGRES_DB: ticketing_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ticketing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://ticketing:ticketing@localhost:5432/ticketing_test?schema=public
+
+    steps:
+    - name: Récupérer le code du dépôt
+      uses: actions/checkout@v4
+
+    - name: Configurer Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Installer les dépendances
+      run: npm ci
+
+    - name: Générer le client Prisma
+      run: npm run db:generate -w @ticketing/api
+
+    - name: Vérifier les types
+      run: npm run typecheck
+
+    - name: Lint
+      run: npm run lint
+
+    - name: Appliquer les migrations
+      run: npm run db:deploy -w @ticketing/api
+
+    - name: Lancer les tests
+      run: npm test
+
+    - name: Build
+      run: npm run build

@@ -1,0 +1,38 @@
+{
+  "name": "ticket-mango",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Solution de ticketing et gestion des incidents",
+  "license": "ISC",
+  "author": "kodjo mango",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build -w @ticketing/shared && npm run build -w @ticketing/api",
+    "typecheck": "npm run build -w @ticketing/shared && npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "test": "npm test --workspaces --if-present",
+    "dev": "npm run build -w @ticketing/shared && npm run dev -w @ticketing/api"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.10.0",
+    "eslint": "^9.39.0",
+    "jest": "^30.5.2",
+    "ts-jest": "^29.4.15",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.0"
+  },
+  "allowScripts": {
+    "prisma@6.19.3": true,
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.28.2": true
+  }
+}

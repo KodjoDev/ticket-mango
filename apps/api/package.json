@@ -1,0 +1,33 @@
+{
+  "name": "@ticketing/api",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "dev": "tsx watch --env-file=.env src/server.ts",
+    "start": "node dist/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest --runInBand",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx --env-file=.env prisma/seed.ts"
+  },
+  "dependencies": {
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/jwt": "^10.2.5",
+    "@fastify/rate-limit": "^11.2.1",
+    "@fastify/sensible": "^6.0.7",
+    "@prisma/client": "~6.19.3",
+    "@ticketing/shared": "0.1.0",
+    "fastify": "^5.12.7",
+    "fastify-plugin": "^5.1.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "pino-pretty": "^13.2.0",
+    "prisma": "~6.19.3",
+    "tsx": "^4.23.15"
+  }
+}
