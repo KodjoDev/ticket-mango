@@ -2023,3 +2023,22 @@ h3.subhead {
   border-radius: 5px;
   background: #1f73b7;
 }
+
+.clip-item {
+  display: flex;
+  align-items: flex-start;
+}
+
+.clip-item .bell-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.clip-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

@@ -6,6 +6,7 @@ import type { EmailSettings, InboundStatus, Mailbox } from '../../api/types';
 import { ErrorMessage, Field, formatDate, Spinner } from '../../components/ui';
 import { useConfig } from '../../config/ConfigContext';
 import { useAdminMutation } from './common';
+import { copyText } from '../../clipboard/copy';
 
 const MAILBOXES_KEY = ['admin', 'mailboxes'];
 
@@ -217,7 +218,7 @@ function MailboxRow({ mailbox, onEdit }: { mailbox: Mailbox; onEdit: () => void 
       <div className="webhook">
         <span className="field-label">URL de réception (webhook)</span>
         <code>{mailbox.webhookUrl}</code>
-        <button type="button" className="link" onClick={() => void navigator.clipboard.writeText(mailbox.webhookUrl)}>
+        <button type="button" className="link" onClick={() => void copyText(mailbox.webhookUrl)}>
           Copier
         </button>
         <button
