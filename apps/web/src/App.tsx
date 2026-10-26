@@ -20,6 +20,8 @@ import { AlertsAdmin } from './pages/admin/AlertsAdmin';
 import { IncidentDetailPage, IncidentListPage } from './pages/IncidentsPage';
 import { ReleaseNotesPage } from './pages/ReleaseNotesPage';
 import { ReleaseDetailPage, ReleaseListPage } from './pages/ReleasesPage';
+import { PrivacyAdmin } from './pages/admin/PrivacyAdmin';
+import { ReportsPage } from './pages/ReportsPage';
 import { StatusPage } from './pages/StatusPage';
 import { BookingPage } from './pages/BookingPage';
 import { LoginPage } from './pages/LoginPage';
@@ -52,6 +54,7 @@ export function AppRoutes() {
         <Route path="/tickets/:id" element={<TicketDetailPage />} />
         <Route path="/releases/manage" element={<ReleaseListPage />} />
         <Route path="/releases/:id" element={<ReleaseDetailPage />} />
+        <Route path="/reports" element={<ReportsPage />} />
         <Route path="/incidents" element={<IncidentListPage />} />
         <Route path="/incidents/:id" element={<IncidentDetailPage />} />
         <Route path="/admin" element={<AdminLayout />}>
@@ -59,6 +62,7 @@ export function AppRoutes() {
           <Route path="users" element={<RequirePermission permission="user:manage"><UsersAdmin /></RequirePermission>} />
           <Route path="dev" element={<RequirePermission permission="settings:manage"><DevAdmin /></RequirePermission>} />
           <Route path="alerts" element={<RequirePermission permission="settings:manage"><AlertsAdmin /></RequirePermission>} />
+          <Route path="privacy" element={<RequirePermission permission="user:manage"><PrivacyAdmin /></RequirePermission>} />
           <Route path="mail" element={<RequirePermission permission="settings:manage"><MailAdmin /></RequirePermission>} />
           <Route path="groups" element={<RequirePermission permission="settings:manage"><GroupsAdmin /></RequirePermission>} />
           <Route path="routing" element={<RequirePermission permission="settings:manage"><RoutingAdmin /></RequirePermission>} />
