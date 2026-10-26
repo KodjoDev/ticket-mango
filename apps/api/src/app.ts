@@ -15,6 +15,8 @@ import { DevService } from './services/dev/service';
 import type { HttpFetch } from './services/dev/providers';
 import { alertAdminRoutes, incidentRoutes, publicStatusRoutes } from './routes/incidents';
 import { IncidentService } from './services/incidents/service';
+import { publicReleaseRoutes, releaseRoutes } from './routes/releases';
+import { ReleaseService } from './services/releases';
 import { attachmentRoutes } from './routes/attachments';
 import { authRoutes } from './routes/auth';
 import { configRoutes } from './routes/config';
@@ -170,6 +172,7 @@ export async function buildApp({
   const imapPoller = new ImapPoller(prisma, inbound, secrets, imapConnector);
   const dev = new DevService({ prisma, tickets, secrets, publicAppUrl, fetcher: devFetch });
   const incidents = new IncidentService({ prisma, notifications, mailer, secrets, fetcher: devFetch, publicAppUrl });
+  const releases = new ReleaseService({ prisma, mailer, publicAppUrl });
   const macros = new MacroService(prisma, configService, tickets);
   const meetings = new MeetingService({
     prisma,
@@ -193,11 +196,13 @@ export async function buildApp({
   await app.register(developerRoutes, { prefix: '/developers', prisma });
   await app.register(macroRoutes, { prefix: '/macros', macros });
   await app.register(devRoutes, { prefix: '/dev', dev });
+  await app.register(releaseRoutes, { prefix: '/releases', releases });
   await app.register(incidentRoutes, { prefix: '/incidents', incidents });
   await app.register(spellcheckRoutes, { prefix: '/spellcheck', client: spellchecker });
 
   // Accès publics (jeton secret dans l'URL)
   await app.register(bookingRoutes, { prefix: '/public/bookings', meetings });
+  await app.register(publicReleaseRoutes, { prefix: '/public/releases', releases });
   await app.register(publicStatusRoutes, { prefix: '/public/status', incidents });
   await app.register(inboundRoutes, { prefix: '/inbound', prisma, inbound });
   await app.register(devWebhookRoutes, { prefix: '/inbound', prisma, dev });

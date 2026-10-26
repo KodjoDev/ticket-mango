@@ -18,6 +18,8 @@ import { UsersAdmin } from './pages/admin/UsersAdmin';
 import { ViewsAdmin } from './pages/admin/ViewsAdmin';
 import { AlertsAdmin } from './pages/admin/AlertsAdmin';
 import { IncidentDetailPage, IncidentListPage } from './pages/IncidentsPage';
+import { ReleaseNotesPage } from './pages/ReleaseNotesPage';
+import { ReleaseDetailPage, ReleaseListPage } from './pages/ReleasesPage';
 import { StatusPage } from './pages/StatusPage';
 import { BookingPage } from './pages/BookingPage';
 import { LoginPage } from './pages/LoginPage';
@@ -43,10 +45,13 @@ export function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/book/:token" element={<BookingPage />} />
       <Route path="/status" element={<StatusPage />} />
+      <Route path="/releases" element={<ReleaseNotesPage />} />
       <Route element={<Layout />}>
         <Route path="/tickets" element={<TicketListPage />} />
         <Route path="/tickets/new" element={<TicketNewPage />} />
         <Route path="/tickets/:id" element={<TicketDetailPage />} />
+        <Route path="/releases/manage" element={<ReleaseListPage />} />
+        <Route path="/releases/:id" element={<ReleaseDetailPage />} />
         <Route path="/incidents" element={<IncidentListPage />} />
         <Route path="/incidents/:id" element={<IncidentDetailPage />} />
         <Route path="/admin" element={<AdminLayout />}>
