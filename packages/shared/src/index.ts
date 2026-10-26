@@ -10,3 +10,4 @@ export * from './dev-integrations';
 export * from './incidents';
 export * from './releases';
 export * from './reporting';
+export * from './custom-fields';

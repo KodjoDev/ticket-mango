@@ -1,4 +1,6 @@
 import type {
+  CustomFieldKind,
+  CustomValues,
   CompiledNotes,
   ReleaseCategory,
   AlertKindName,
@@ -51,6 +53,7 @@ export interface Ticket {
   type: string;
   component: string | null;
   environment: string | null;
+  customValues: CustomValues;
   impact: Impact;
   urgency: Urgency;
   priority: Priority;
@@ -209,6 +212,7 @@ export interface AppConfig {
   ticketForm: LayoutItem<TicketFormField>[];
   listColumns: LayoutItem<ListColumn>[];
   slaPolicy: SlaPolicy;
+  customFields: CustomField[];
   groups: GroupRef[];
   features: { spellcheck: boolean; meetingProvider: string };
 }
@@ -387,7 +391,22 @@ export interface TicketFilters {
   pageSize?: number;
 }
 
+export interface CustomField {
+  id: string;
+  key: string;
+  label: string;
+  kind: CustomFieldKind;
+  options: string[];
+  required: boolean;
+  forRequester: boolean;
+  position: number;
+  isActive: boolean;
+}
+
+export type CustomFieldInput = Pick<CustomField, 'key' | 'label' | 'kind' | 'required' | 'forRequester'> & { options?: string[] };
+
 export type TicketInput = Partial<{
+  customValues: CustomValues;
   subject: string;
   description: string;
   type: string;

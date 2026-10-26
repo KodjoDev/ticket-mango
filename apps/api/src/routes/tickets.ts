@@ -1,4 +1,4 @@
-import { IMPACTS, OPTION_KEY_PATTERN, PRIORITIES, SLA_STATES, TICKET_STATUSES, URGENCIES } from '@ticketing/shared';
+import { CUSTOM_FIELD_KEY_PATTERN, IMPACTS, OPTION_KEY_PATTERN, PRIORITIES, SLA_STATES, TICKET_STATUSES, URGENCIES } from '@ticketing/shared';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { readMultipart } from '../lib/multipart';
@@ -8,6 +8,8 @@ const subject = z.string().trim().min(1).max(250);
 const description = z.string().trim().min(1).max(50_000);
 // Les valeurs de liste sont administrables : leur existence est vérifiée par le service.
 const optionKey = z.string().regex(OPTION_KEY_PATTERN, 'Clé de liste invalide');
+
+const customValues = z.record(z.string().regex(CUSTOM_FIELD_KEY_PATTERN), z.union([z.string().max(5000), z.number(), z.boolean(), z.null()]));
 
 const staffCreateSchema = z
   .object({
@@ -23,12 +25,13 @@ const staffCreateSchema = z
     assigneeId: z.string().uuid().nullable().optional(),
     groupId: z.string().uuid().nullable().optional(),
     tagIds: z.array(z.string().uuid()).max(50).optional(),
+    customValues: customValues.optional(),
   })
   .strict();
 
 // Un utilisateur externe décrit sa demande ; la qualification (impact, urgence, priorité) revient au support.
 const externalCreateSchema = staffCreateSchema
-  .pick({ subject: true, description: true, type: true, component: true, environment: true })
+  .pick({ subject: true, description: true, type: true, component: true, environment: true, customValues: true })
   .strict();
 
 const updateSchema = staffCreateSchema
@@ -68,6 +71,24 @@ const commentSchema = z
 
 export const ticketRoutes: FastifyPluginAsync<{ tickets: TicketService }> = async (app, { tickets }) => {
   app.addHook('preHandler', app.authenticate);
+
+  // Un demandeur ne voit que les champs personnalisés qui lui sont ouverts.
+  app.addHook('preSerialization', async (request, _reply, payload) => {
+    if (!request.currentUser || isStaff(request.currentUser) || payload === null || typeof payload !== 'object') return payload;
+    const allowed = await tickets.requesterFieldKeys();
+    const strip = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(strip);
+      if (value === null || typeof value !== 'object' || value instanceof Date) return value;
+      const record = { ...(value as Record<string, unknown>) };
+      if (record.customValues && typeof record.customValues === 'object') {
+        record.customValues = Object.fromEntries(Object.entries(record.customValues).filter(([k]) => allowed.has(k)));
+      }
+      if (Array.isArray(record.items)) record.items = record.items.map(strip);
+      if (Array.isArray(record.children)) record.children = record.children.map(strip);
+      return record;
+    };
+    return strip(payload);
+  });
 
   app.get('/', async (request) => {
     const { groupId, ...query } = listQuerySchema.parse(request.query);

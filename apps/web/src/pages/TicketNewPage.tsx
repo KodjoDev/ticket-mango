@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { computePriority, DEFAULT_TICKET_TYPE } from '@ticketing/shared';
+import { computePriority, DEFAULT_TICKET_TYPE, type CustomValues } from '@ticketing/shared';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { api } from '../api/client';
 import type { User } from '../api/types';
 import { useAuth, useCurrentUser } from '../auth/AuthContext';
+import { CustomFieldInputs } from '../components/CustomFields';
 import { QualificationFields, type QualificationValues } from '../components/QualificationFields';
 import { RequesterPicker } from '../components/Requester';
 import { Avatar, ErrorMessage, Field, PriorityBadge } from '../components/ui';
@@ -24,6 +25,7 @@ export function TicketNewPage() {
   // Un agent peut saisir le ticket pour le compte d'un client ; par défaut, il en est le demandeur.
   const [requester, setRequester] = useState<User>(user);
   const [pickingRequester, setPickingRequester] = useState(false);
+  const [customValues, setCustomValues] = useState<CustomValues>({});
   const [values, setValues] = useState<QualificationValues>({
     type: DEFAULT_TICKET_TYPE,
     component: null,
@@ -40,6 +42,7 @@ export function TicketNewPage() {
         subject,
         description,
         ...lists,
+        customValues,
         ...(canQualify && { impact, urgency, tagIds }),
         ...(requester.id !== user.id && { requesterId: requester.id }),
       });
@@ -99,6 +102,12 @@ export function TicketNewPage() {
             values={values}
             onChange={(change) => setValues((v) => ({ ...v, ...change }))}
             supportFields={canQualify}
+          />
+          <CustomFieldInputs
+            fields={config.customFields}
+            values={customValues}
+            live
+            onChange={(key, value) => setCustomValues((v) => ({ ...v, [key]: value }))}
           />
           {canQualify && (
             <div className="field">

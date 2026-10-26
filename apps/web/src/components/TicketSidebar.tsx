@@ -5,6 +5,7 @@ import { api, ApiError } from '../api/client';
 import type { Agent, Ticket, TicketDetail, TicketInput } from '../api/types';
 import { useAuth, useCurrentUser } from '../auth/AuthContext';
 import { useConfig } from '../config/ConfigContext';
+import { CustomFieldInputs } from './CustomFields';
 import { QualificationFields } from './QualificationFields';
 import { DevLinksCard } from './DevLinks';
 import { MergeCard } from './Merge';
@@ -117,6 +118,15 @@ export function TicketSidebar({ ticket, agents }: { ticket: TicketDetail; agents
           onChange={(change) => update.mutate(change)}
           disabled={!canQualify || busy}
           supportFields={can('ticket:read:all')}
+        />
+        <CustomFieldInputs
+          // Les valeurs sont remontées au serveur : la clé force la relecture après chaque enregistrement.
+          key={ticket.updatedAt}
+          fields={config.customFields}
+          values={ticket.customValues ?? {}}
+          live={false}
+          disabled={!canQualify || busy}
+          onChange={(key, value) => update.mutate({ customValues: { [key]: value } })}
         />
 
         <div className="field">

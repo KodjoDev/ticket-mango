@@ -20,6 +20,8 @@ import type {
   Agent,
   AlertChannel,
   AppConfig,
+  CustomField,
+  CustomFieldInput,
   PurgeResult,
   PublicRelease,
   ReleaseCandidate,
@@ -299,6 +301,11 @@ export const adminApi = {
   exportUser: (id: string) => request<unknown>('GET', `/admin/privacy/users/${id}/export`),
   anonymizeUser: (id: string, eraseContent: boolean) => request<void>('POST', `/admin/privacy/users/${id}/anonymize`, { eraseContent }),
   purge: (months: number, dryRun: boolean) => request<PurgeResult>('POST', '/admin/privacy/purge', { months, dryRun }),
+  customFields: () => request<CustomField[]>('GET', '/admin/custom-fields'),
+  createCustomField: (input: CustomFieldInput) => request<CustomField>('POST', '/admin/custom-fields', input),
+  updateCustomField: (id: string, input: Partial<Pick<CustomField, 'label' | 'options' | 'required' | 'forRequester' | 'isActive'>>) =>
+    request<CustomField>('PATCH', `/admin/custom-fields/${id}`, input),
+  reorderCustomFields: (ids: string[]) => request<CustomField[]>('PUT', '/admin/custom-fields/order', { ids }),
   alertChannels: () => request<AlertChannel[]>('GET', '/admin/alert-channels'),
   createAlertChannel: (input: { kind: AlertKindName; name: string; target: string; isActive: boolean }) =>
     request<AlertChannel>('POST', '/admin/alert-channels', input),

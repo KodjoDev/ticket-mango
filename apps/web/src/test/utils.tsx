@@ -36,6 +36,7 @@ export const testConfig: AppConfig = {
   ticketForm: DEFAULT_TICKET_FORM,
   listColumns: DEFAULT_LIST_COLUMNS,
   slaPolicy: DEFAULT_SLA_POLICY,
+  customFields: [],
   groups: [
     { id: 'g-n1', name: 'Support N1', isActive: true, memberIds: ['u-agent'] },
     { id: 'g-n2', name: 'Support N2', isActive: true, memberIds: [] },
@@ -139,6 +140,7 @@ export function makeTicket(overrides: Partial<TicketDetail> = {}): TicketDetail 
     children: [],
     devLinks: [],
     fixedInVersion: null,
+    customValues: {},
     awaitingAgent: false,
     lastRequesterReplyAt: null,
     lastAgentReplyAt: null,

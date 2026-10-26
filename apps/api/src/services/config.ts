@@ -4,6 +4,7 @@ import {
   DEFAULT_PRIORITY_MATRIX,
   DEFAULT_SLA_POLICY,
   DEFAULT_TICKET_FORM,
+  checkCustomValue,
   IMPACTS,
   LIST_COLUMNS,
   normalizeLayout,
@@ -11,6 +12,9 @@ import {
   PRIORITIES,
   TICKET_FORM_FIELDS,
   URGENCIES,
+  type CustomFieldDef,
+  type CustomValue,
+  type CustomValues,
   type PriorityMatrix,
   type SlaPolicy,
 } from '@ticketing/shared';
@@ -99,6 +103,45 @@ export class ConfigService {
   async slaPolicy(): Promise<SlaPolicy> {
     const parsed = slaPolicySchema.safeParse(await this.setting(SETTING_KEYS.slaPolicy));
     return parsed.success ? parsed.data : DEFAULT_SLA_POLICY;
+  }
+
+  async customFields() {
+    return this.prisma.customField.findMany({ orderBy: { position: 'asc' } });
+  }
+
+  /**
+   * Contrôle les valeurs de champs personnalisés reçues et renvoie l'ensemble à stocker, avec les changements à journaliser.
+   * Création : tous les champs actifs visibles sont évalués (obligatoires compris). Mise à jour : seuls les champs fournis.
+   * `requesterOnly` limite aux champs ouverts au demandeur (utilisateur externe).
+   */
+  async resolveCustomValues(
+    input: Record<string, unknown> | undefined,
+    opts: { current?: CustomValues; requesterOnly: boolean },
+  ): Promise<{ values: CustomValues; changes: Record<string, { from: unknown; to: unknown }> } | undefined> {
+    const creating = opts.current === undefined;
+    if (input === undefined && !creating) return undefined;
+    const fields = (await this.customFields()).filter((f) => f.isActive && (!opts.requesterOnly || f.forRequester));
+    const provided = input ?? {};
+    for (const key of Object.keys(provided)) {
+      if (!fields.some((f) => f.key === key)) throw badRequest(`Champ personnalisé inconnu, archivé ou non autorisé : ${key}`);
+    }
+    const values: CustomValues = { ...(opts.current ?? {}) };
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+    for (const field of fields) {
+      if (!creating && !(field.key in provided)) continue;
+      const def: CustomFieldDef = { key: field.key, label: field.label, kind: field.kind, required: field.required, options: field.options as string[] };
+      const result = checkCustomValue(def, provided[field.key]);
+      if (!result.ok) throw badRequest(result.error);
+      const before: CustomValue | undefined = values[field.key];
+      if (result.value === null) delete values[field.key];
+      else values[field.key] = result.value;
+      if ((before ?? null) !== result.value && !(creating && result.value === false)) {
+        // Les textes peuvent contenir des données personnelles : seul le fait qu'ils ont changé est journalisé.
+        const hide = field.kind === 'TEXT' || field.kind === 'LONGTEXT';
+        changes[`custom.${field.key}`] = hide ? { from: '[modifié]', to: '[modifié]' } : { from: before ?? null, to: result.value };
+      }
+    }
+    return { values, changes };
   }
 
   async ticketForm() {

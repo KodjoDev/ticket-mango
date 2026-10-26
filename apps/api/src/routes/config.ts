@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import { hasPermission } from '@ticketing/shared';
 import type { FastifyPluginAsync } from 'fastify';
 import type { ConfigService } from '../services/config';
 
@@ -13,8 +14,8 @@ export const configRoutes: FastifyPluginAsync<{ prisma: PrismaClient; config: Co
   app,
   { prisma, config, features },
 ) => {
-  app.get('/', { preHandler: app.authenticate }, async () => {
-    const [options, tags, priorityMatrix, ticketForm, listColumns, slaPolicy, groups] = await Promise.all([
+  app.get('/', { preHandler: app.authenticate }, async (request) => {
+    const [options, tags, priorityMatrix, ticketForm, listColumns, slaPolicy, groups, customFields] = await Promise.all([
       config.options(),
       prisma.tag.findMany({ orderBy: { name: 'asc' } }),
       config.priorityMatrix(),
@@ -25,6 +26,7 @@ export const configRoutes: FastifyPluginAsync<{ prisma: PrismaClient; config: Co
         orderBy: { position: 'asc' },
         select: { id: true, name: true, isActive: true, members: { select: { userId: true } } },
       }),
+      config.customFields(),
     ]);
     return {
       options,
@@ -33,6 +35,8 @@ export const configRoutes: FastifyPluginAsync<{ prisma: PrismaClient; config: Co
       ticketForm,
       listColumns,
       slaPolicy,
+      // Un demandeur ne reçoit que les champs qui lui sont ouverts.
+      customFields: customFields.filter((f) => f.isActive && (hasPermission(request.currentUser.role, 'ticket:qualify') || f.forRequester)),
       groups: groups.map(({ members, ...g }) => ({ ...g, memberIds: members.map((m) => m.userId) })),
       features,
     };
