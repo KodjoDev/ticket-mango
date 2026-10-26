@@ -27,6 +27,8 @@ export const PERMISSIONS = [
   'settings:manage',
   /** Ouvrir, mettre à jour et clore un incident majeur, diffuser aux clients, rédiger le post-mortem. */
   'incident:manage',
+  /** Préparer, publier et notifier une version de livraison. */
+  'release:manage',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -46,7 +48,7 @@ const AGENT_PERMISSIONS: Permission[] = [
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   READER: ['ticket:read:all', 'audit:read'],
   AGENT_N1: AGENT_PERMISSIONS,
-  AGENT_N2: [...AGENT_PERMISSIONS, 'ticket:priority:override', 'incident:manage'],
+  AGENT_N2: [...AGENT_PERMISSIONS, 'ticket:priority:override', 'incident:manage', 'release:manage'],
   ADMIN: PERMISSIONS,
   // Le développeur suit les tickets et échange avec le support en notes internes, sans qualifier.
   DEVELOPER: ['ticket:read:all', 'comment:create', 'comment:internal', 'audit:read'],

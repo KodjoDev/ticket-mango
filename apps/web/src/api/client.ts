@@ -1,5 +1,6 @@
 import type {
   AlertKindName,
+  ReleaseCategory,
   DevProviderName,
   IncidentSeverity,
   IncidentStatus,
@@ -18,6 +19,10 @@ import type {
   Agent,
   AlertChannel,
   AppConfig,
+  PublicRelease,
+  ReleaseCandidate,
+  ReleaseDetail,
+  ReleaseSummary,
   IncidentDetail,
   IncidentSummary,
   PublicStatus,
@@ -202,12 +207,27 @@ export const api = {
   broadcastIncident: (id: string, input: { recipients: string[]; subject: string; message: string }) =>
     request<{ recipients: number; sent: number; failed: number; delivered: boolean }>('POST', `/incidents/${id}/broadcast`, input),
 
+  releases: () => request<ReleaseSummary[]>('GET', '/releases'),
+  release: (id: string) => request<ReleaseDetail>('GET', `/releases/${id}`),
+  releaseCandidates: (id: string) => request<ReleaseCandidate[]>('GET', `/releases/${id}/candidates`),
+  createRelease: (input: { version: string; title?: string | null }) => request<ReleaseDetail>('POST', '/releases', input),
+  deleteRelease: (id: string) => request<void>('DELETE', `/releases/${id}`),
+  addReleaseTickets: (id: string, ticketIds: number[]) => request<ReleaseDetail>('POST', `/releases/${id}/tickets`, { ticketIds }),
+  updateReleaseItem: (id: string, ticketId: number, input: { category?: ReleaseCategory; summary?: string | null }) =>
+    request<ReleaseDetail>('PATCH', `/releases/${id}/tickets/${ticketId}`, input),
+  removeReleaseTicket: (id: string, ticketId: number) => request<ReleaseDetail>('DELETE', `/releases/${id}/tickets/${ticketId}`),
+  publishRelease: (id: string, notify: boolean) =>
+    request<{ release: ReleaseDetail; notification: { requesters: number; sent: number; failed: number; delivered: boolean } | null }>('POST', `/releases/${id}/publish`, { notify }),
+  notifyRelease: (id: string) =>
+    request<{ requesters: number; sent: number; failed: number; delivered: boolean }>('POST', `/releases/${id}/notify`),
+
   spellcheck: (text: string) => request<{ issues: SpellcheckIssue[] }>('POST', '/spellcheck', { text }),
 };
 
 /** Page publique de réservation : aucune session requise. */
 export const publicApi = {
   booking: (token: string) => request<Booking>('GET', `/public/bookings/${token}`),
+  releaseNotes: () => request<PublicRelease[]>('GET', '/public/releases'),
   status: () => request<PublicStatus>('GET', '/public/status'),
   book: (token: string, slotId: string) => request<Booking>('POST', `/public/bookings/${token}`, { slotId }),
 };

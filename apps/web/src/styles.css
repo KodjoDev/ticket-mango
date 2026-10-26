@@ -1971,3 +1971,16 @@ h3.subhead {
   background: #e6f4ea;
   color: #1e6b35;
 }
+
+.release-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.release-item .inline-form input {
+  flex: 1;
+}
