@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import type { Meeting, Ticket } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { ErrorMessage, Field, formatDate } from './ui';
+import { copyText } from '../clipboard/copy';
 
 const DURATIONS = [15, 30, 45, 60, 90];
 const STATUS: Record<Meeting['status'], string> = {
@@ -167,7 +168,7 @@ function MeetingItem({ meeting, ticketId }: { meeting: Meeting; ticketId: number
         <button
           type="button"
           className="link"
-          onClick={() => void navigator.clipboard.writeText(meeting.bookingUrl!).then(() => setCopied(true))}
+          onClick={() => void copyText(meeting.bookingUrl!).then((ok) => ok && setCopied(true))}
         >
           {copied ? 'Lien copié' : 'Copier le lien de réservation'}
         </button>

@@ -13,6 +13,7 @@ import { adminApi, type DevIntegrationInput } from '../../api/client';
 import type { DevIntegration } from '../../api/types';
 import { ErrorMessage, Field, Spinner } from '../../components/ui';
 import { useAdminMutation } from './common';
+import { copyText } from '../../clipboard/copy';
 
 const KEY = ['admin', 'dev-integrations'];
 
@@ -201,7 +202,7 @@ function IntegrationRow({ integration, onEdit }: { integration: DevIntegration; 
       <div className="webhook">
         <span className="field-label">URL du webhook entrant</span>
         <code>{integration.webhookUrl}</code>
-        <button type="button" className="link" onClick={() => void navigator.clipboard.writeText(integration.webhookUrl)}>
+        <button type="button" className="link" onClick={() => void copyText(integration.webhookUrl)}>
           Copier
         </button>
       </div>
