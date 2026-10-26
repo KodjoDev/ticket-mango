@@ -114,6 +114,8 @@ export const api = {
   me: () => request<User>('GET', '/auth/me'),
 
   agents: () => request<Agent[]>('GET', '/agents'),
+  requesters: (q: string) => request<User[]>('GET', `/requesters?${new URLSearchParams({ q })}`),
+  createRequester: (input: { email: string; name: string }) => request<User>('POST', '/requesters', input),
 
   tickets: (filters: TicketFilters) => request<Page<Ticket>>('GET', `/tickets${toQueryString(filters)}`),
   ticket: (id: number) => request<TicketDetail>('GET', `/tickets/${id}`),

@@ -1,4 +1,4 @@
-import { actor, describeDb, resetDb, setup, teardown, type TestContext } from './helpers';
+import { actor, createUser, describeDb, resetDb, setup, teardown, type TestContext } from './helpers';
 
 describeDb('tickets', () => {
   let ctx: TestContext;
@@ -103,6 +103,66 @@ describeDb('tickets', () => {
       expect((await reader.post('/tickets', base)).statusCode).toBe(403);
       expect((await reader.patch(`/tickets/${id}`, { urgency: 'HIGH' })).statusCode).toBe(403);
       expect((await reader.get(`/tickets/${id}`)).statusCode).toBe(200);
+    });
+  });
+
+  describe('demandeur', () => {
+    it('laisse un agent créer le ticket pour le compte d’un client puis changer de demandeur', async () => {
+      const agent = await actor(ctx, 'AGENT_N1');
+      const claire = await actor(ctx, 'EXTERNAL_USER');
+      const marc = await actor(ctx, 'EXTERNAL_USER');
+
+      const created = await agent.post('/tickets', { ...base, requesterId: claire.user.id });
+      expect(created.json().requester.id).toBe(claire.user.id);
+      const { id } = created.json();
+
+      const res = await agent.patch(`/tickets/${id}`, { requesterId: marc.user.id });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().requester.id).toBe(marc.user.id);
+      // Le nouveau demandeur voit le ticket, l'ancien non.
+      expect((await marc.get(`/tickets/${id}`)).statusCode).toBe(200);
+      expect((await claire.get(`/tickets/${id}`)).statusCode).toBe(404);
+
+      const audit = (await agent.get(`/tickets/${id}/audit`)).json();
+      expect(audit.at(-1).changes).toEqual({
+        requester: {
+          from: `${claire.user.name} <${claire.user.email}>`,
+          to: `${marc.user.name} <${marc.user.email}>`,
+        },
+      });
+    });
+
+    it('refuse le changement de demandeur à un client et vers un compte désactivé', async () => {
+      const agent = await actor(ctx, 'AGENT_N1');
+      const client = await actor(ctx, 'EXTERNAL_USER');
+      const inactive = await createUser(ctx.prisma, 'EXTERNAL_USER', { isActive: false });
+      const { id } = (await client.post('/tickets', base)).json();
+
+      expect((await client.patch(`/tickets/${id}`, { requesterId: agent.user.id })).statusCode).toBe(403);
+      expect((await agent.patch(`/tickets/${id}`, { requesterId: inactive.id })).statusCode).toBe(400);
+      expect((await agent.post('/tickets', { ...base, requesterId: inactive.id })).statusCode).toBe(400);
+    });
+
+    it('recherche les demandeurs et crée un contact externe sans mot de passe', async () => {
+      const agent = await actor(ctx, 'AGENT_N1');
+      const client = await actor(ctx, 'EXTERNAL_USER');
+
+      const found = await agent.get(`/requesters?q=${encodeURIComponent(client.user.email.toUpperCase())}`);
+      expect(found.json().map((u: { id: string }) => u.id)).toEqual([client.user.id]);
+
+      const created = await agent.post('/requesters', { email: 'Paul@Client.local', name: 'Paul Martin' });
+      expect(created.statusCode).toBe(201);
+      expect(created.json()).toMatchObject({ email: 'paul@client.local', role: 'EXTERNAL_USER' });
+      const contact = await ctx.prisma.user.findUniqueOrThrow({ where: { email: 'paul@client.local' } });
+      expect(contact.passwordHash).toBeNull();
+
+      // Une adresse déjà connue renvoie le compte existant.
+      const again = await agent.post('/requesters', { email: 'paul@client.local', name: 'Autre nom' });
+      expect(again.statusCode).toBe(200);
+      expect(again.json().id).toBe(contact.id);
+
+      expect((await client.get('/requesters')).statusCode).toBe(403);
+      expect((await client.post('/requesters', { email: 'x@client.local', name: 'X' })).statusCode).toBe(403);
     });
   });
 

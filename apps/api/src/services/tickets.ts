@@ -90,6 +90,8 @@ export interface UpdateTicketInput {
   urgency?: Urgency;
   /** `null` annule le forçage et revient à la priorité calculée par la matrice. */
   priority?: Priority | null;
+  /** Ticket saisi pour le compte d'un client (téléphone, oral…) : le support corrige le demandeur. */
+  requesterId?: string;
   assigneeId?: string | null;
   groupId?: string | null;
   /** Remplace l'ensemble des tags du ticket. */
@@ -321,8 +323,7 @@ export class TicketService {
     }
     if (input.requesterId && input.requesterId !== user.id) {
       ensure(user, 'ticket:qualify');
-      const requester = await this.prisma.user.findUnique({ where: { id: input.requesterId } });
-      if (!requester) throw badRequest('Demandeur introuvable');
+      await this.assertRequester(input.requesterId);
     }
     const type = input.type ?? DEFAULT_TICKET_TYPE;
     await this.d.config.assertOptionUsable('TYPE', type);
@@ -395,6 +396,11 @@ export class TicketService {
       ensure(user, 'ticket:qualify');
     }
     if (input.priority !== undefined) ensure(user, 'ticket:priority:override');
+    let requester: { name: string; email: string } | null = null;
+    if (input.requesterId !== undefined && input.requesterId !== current.requesterId) {
+      ensure(user, 'ticket:qualify');
+      requester = await this.assertRequester(input.requesterId);
+    }
     if (input.assigneeId !== undefined) {
       ensure(user, 'ticket:assign');
       if (input.assigneeId) await this.assertAssignable(input.assigneeId);
@@ -434,6 +440,14 @@ export class TicketService {
     const changes = diff(current, next);
     // La description peut être longue et contenir des données personnelles : on ne journalise que le fait qu'elle a changé.
     if (changes.description) changes.description = { from: '[modifié]', to: '[modifié]' };
+    // Le demandeur peut être un contact externe, inconnu de l'interface : on journalise son nom et son adresse.
+    if (changes.requesterId) {
+      delete changes.requesterId;
+      changes.requester = {
+        from: `${current.requester.name} <${current.requester.email}>`,
+        to: requester && `${requester.name} <${requester.email}>`,
+      };
+    }
 
     const tagsChanged =
       nextTagIds !== undefined &&
@@ -698,5 +712,11 @@ export class TicketService {
     if (!assignee || !assignee.isActive || !hasPermission(assignee.role, 'ticket:transition')) {
       throw badRequest("L'utilisateur assigné doit être un agent actif");
     }
+  }
+
+  private async assertRequester(userId: string) {
+    const requester = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!requester || !requester.isActive) throw badRequest('Demandeur introuvable ou désactivé');
+    return requester;
   }
 }

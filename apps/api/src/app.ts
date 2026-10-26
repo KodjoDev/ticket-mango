@@ -9,7 +9,7 @@ import { SecretBox } from './lib/secrets';
 import { authPlugin } from './plugins/auth';
 import { registerErrorHandler } from './plugins/errors';
 import { adminRoutes } from './routes/admin';
-import { agentRoutes } from './routes/agents';
+import { agentRoutes, requesterRoutes } from './routes/agents';
 import { attachmentRoutes } from './routes/attachments';
 import { authRoutes } from './routes/auth';
 import { configRoutes } from './routes/config';
@@ -124,6 +124,7 @@ export async function buildApp({
   });
   await app.register(userRoutes, { prefix: '/users', prisma });
   await app.register(agentRoutes, { prefix: '/agents', prisma });
+  await app.register(requesterRoutes, { prefix: '/requesters', prisma });
 
   const configService = new ConfigService(prisma);
   await app.register(configRoutes, {

@@ -3,13 +3,16 @@ import { computePriority, DEFAULT_TICKET_TYPE } from '@ticketing/shared';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { api } from '../api/client';
-import { useAuth } from '../auth/AuthContext';
+import type { User } from '../api/types';
+import { useAuth, useCurrentUser } from '../auth/AuthContext';
 import { QualificationFields, type QualificationValues } from '../components/QualificationFields';
-import { ErrorMessage, Field, PriorityBadge } from '../components/ui';
+import { RequesterPicker } from '../components/Requester';
+import { Avatar, ErrorMessage, Field, PriorityBadge } from '../components/ui';
 import { useConfig } from '../config/ConfigContext';
 
 export function TicketNewPage() {
   const { can } = useAuth();
+  const user = useCurrentUser();
   const config = useConfig();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -18,6 +21,9 @@ export function TicketNewPage() {
 
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
+  // Un agent peut saisir le ticket pour le compte d'un client ; par défaut, il en est le demandeur.
+  const [requester, setRequester] = useState<User>(user);
+  const [pickingRequester, setPickingRequester] = useState(false);
   const [values, setValues] = useState<QualificationValues>({
     type: DEFAULT_TICKET_TYPE,
     component: null,
@@ -30,7 +36,13 @@ export function TicketNewPage() {
   const create = useMutation({
     mutationFn: () => {
       const { impact, urgency, tagIds, ...lists } = values;
-      return api.createTicket({ subject, description, ...lists, ...(canQualify && { impact, urgency, tagIds }) });
+      return api.createTicket({
+        subject,
+        description,
+        ...lists,
+        ...(canQualify && { impact, urgency, tagIds }),
+        ...(requester.id !== user.id && { requesterId: requester.id }),
+      });
     },
     onSuccess: (ticket) => {
       void queryClient.invalidateQueries({ queryKey: ['tickets'] });
@@ -51,6 +63,31 @@ export function TicketNewPage() {
       </header>
       <form className="card form" onSubmit={onSubmit}>
         <ErrorMessage error={create.error} />
+        {canQualify && (
+          <div className="field">
+            <span className="field-label">Demandeur</span>
+            {pickingRequester ? (
+              <RequesterPicker
+                onSelect={(u) => {
+                  setRequester(u);
+                  setPickingRequester(false);
+                }}
+                onCancel={() => setPickingRequester(false)}
+              />
+            ) : (
+              <div className="requester">
+                <Avatar name={requester.name} size="sm" />
+                <span>
+                  {requester.name} <span className="muted small">{requester.email}</span>
+                  {requester.id === user.id && <span className="muted small"> (vous)</span>}
+                </span>
+                <button type="button" className="link" onClick={() => setPickingRequester(true)}>
+                  Changer
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <Field label="Sujet">
           <input required maxLength={250} value={subject} onChange={(e) => setSubject(e.target.value)} />
         </Field>

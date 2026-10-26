@@ -359,6 +359,7 @@ export type TicketInput = Partial<{
   impact: Impact;
   urgency: Urgency;
   priority: Priority | null;
+  requesterId: string;
   assigneeId: string | null;
   groupId: string | null;
   tagIds: string[];

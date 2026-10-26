@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { PRIORITIES, PRIORITY_LABELS, STATUS_LABELS, STATUS_TRANSITIONS, type TicketStatus } from '@ticketing/shared';
 import { api, ApiError } from '../api/client';
 import type { Agent, Ticket, TicketDetail, TicketInput } from '../api/types';
@@ -7,6 +8,7 @@ import { useConfig } from '../config/ConfigContext';
 import { QualificationFields } from './QualificationFields';
 import { MergeCard } from './Merge';
 import { ReferentCard } from './Referent';
+import { RequesterPicker } from './Requester';
 import { SlaCard } from './Sla';
 import { Avatar, ErrorMessage, Field, formatDate, options, PriorityBadge, StatusBadge } from './ui';
 
@@ -24,6 +26,7 @@ export function TicketSidebar({ ticket, agents }: { ticket: TicketDetail; agents
   const user = useCurrentUser();
   const queryClient = useQueryClient();
   const closed = ticket.status === 'CLOSED';
+  const [editingRequester, setEditingRequester] = useState(false);
 
   const onSuccess = (updated: Ticket) => {
     // Fusion : la réponse ne contient pas la liste des tickets rattachés du détail.
@@ -40,13 +43,21 @@ export function TicketSidebar({ ticket, agents }: { ticket: TicketDetail; agents
   };
 
   const update = useMutation({ mutationFn: (input: TicketInput) => api.updateTicket(ticket.id, input), onSuccess, onError });
+  const changeRequester = useMutation({
+    mutationFn: (requesterId: string) => api.updateTicket(ticket.id, { requesterId }),
+    onSuccess: (updated: Ticket) => {
+      onSuccess(updated);
+      setEditingRequester(false);
+    },
+    onError,
+  });
   const transition = useMutation({ mutationFn: (to: TicketStatus) => api.transition(ticket.id, to), onSuccess, onError });
   const route = useMutation({ mutationFn: () => api.route(ticket.id), onSuccess, onError });
 
   const canQualify = can('ticket:qualify') && !closed;
   const canAssign = can('ticket:assign') && !closed;
   const nextStatuses = can('ticket:transition') ? STATUS_TRANSITIONS[ticket.status] : [];
-  const busy = update.isPending || transition.isPending || route.isPending;
+  const busy = update.isPending || transition.isPending || route.isPending || changeRequester.isPending;
   // Membres du groupe du ticket proposés en premier dans la liste d'assignation.
   const groupMembers = new Set(config.groups.find((g) => g.id === ticket.group?.id)?.memberIds ?? []);
   const sortedAgents = [...agents].sort((a, b) => Number(groupMembers.has(b.id)) - Number(groupMembers.has(a.id)));
@@ -55,6 +66,7 @@ export function TicketSidebar({ ticket, agents }: { ticket: TicketDetail; agents
     <aside className="ticket-side">
       <section className="card">
         <h2>Demandeur</h2>
+        <ErrorMessage error={changeRequester.error} />
         <div className="requester">
           <Avatar name={ticket.requester.name} />
           <div>
@@ -62,6 +74,20 @@ export function TicketSidebar({ ticket, agents }: { ticket: TicketDetail; agents
             <div className="muted small">{ticket.requester.email}</div>
           </div>
         </div>
+        {canQualify &&
+          (editingRequester ? (
+            <RequesterPicker
+              disabled={busy}
+              onSelect={(u) => (u.id === ticket.requester.id ? setEditingRequester(false) : changeRequester.mutate(u.id))}
+              onCancel={() => setEditingRequester(false)}
+            />
+          ) : (
+            <div className="link-row">
+              <button type="button" className="link" disabled={busy} onClick={() => setEditingRequester(true)}>
+                Changer le demandeur
+              </button>
+            </div>
+          ))}
       </section>
 
       {can('ticket:read:all') && ticket.status !== 'CLOSED' && <SlaCard sla={ticket.sla} />}

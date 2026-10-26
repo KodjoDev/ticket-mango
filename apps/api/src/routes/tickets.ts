@@ -32,7 +32,6 @@ const externalCreateSchema = staffCreateSchema
   .strict();
 
 const updateSchema = staffCreateSchema
-  .omit({ requesterId: true })
   .extend({ priority: z.enum(PRIORITIES).nullable() })
   .partial()
   .strict();

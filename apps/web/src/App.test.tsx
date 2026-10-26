@@ -151,6 +151,29 @@ describe('détail d’un ticket', () => {
     await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({ method: 'PATCH', body: { assigneeId: agent.id } })));
   });
 
+  it('permet au support de changer le demandeur, y compris vers un nouveau contact', async () => {
+    const paul = { id: 'u-paul', email: 'paul@client.local', name: 'Paul Martin', role: 'EXTERNAL_USER' };
+    const calls = mockApi({
+      ...detailRoutes(),
+      'GET /requesters': (_body, url) => ({ json: url.searchParams.get('q') ? [] : [agent, external] }),
+      'POST /requesters': () => ({ status: 201, json: paul }),
+      'PATCH /tickets/42': () => ({ json: makeTicket({ requester: paul }) }),
+    });
+    renderApp('/tickets/42');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Changer le demandeur' }));
+    await userEvent.type(screen.getByLabelText('Rechercher un demandeur'), 'paul@client.local');
+    await userEvent.type(await screen.findByLabelText('Nom du nouveau contact'), 'Paul Martin');
+    await userEvent.click(screen.getByRole('button', { name: 'Créer le contact' }));
+
+    await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({ method: 'PATCH', body: { requesterId: paul.id } })));
+    expect(calls).toContainEqual(
+      expect.objectContaining({ method: 'POST', path: '/requesters', body: { email: 'paul@client.local', name: 'Paul Martin' } }),
+    );
+    expect(await screen.findByText('Paul Martin')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Rechercher un demandeur')).not.toBeInTheDocument();
+  });
+
   it('masque les actions du support à l’utilisateur externe', async () => {
     mockApi({ ...detailRoutes(external), 'GET /tickets/42/comments': [] });
     renderApp('/tickets/42');
@@ -202,5 +225,33 @@ describe('détail d’un ticket', () => {
     const note = (await screen.findByText('Piste : cache')).closest('li')!;
     expect(note).toHaveClass('internal');
     expect(within(note).getByText('Note interne')).toBeInTheDocument();
+  });
+});
+
+describe('création d’un ticket', () => {
+  it('laisse l’agent saisir le ticket pour le compte d’un client', async () => {
+    const calls = mockApi({
+      'GET /auth/me': agent,
+      'GET /requesters': [external],
+      'POST /tickets': () => ({ status: 201, json: makeTicket() }),
+      'GET /tickets/42': makeTicket(),
+      'GET /tickets/42/comments': [],
+      'GET /tickets/42/audit': [],
+      'GET /agents': [],
+    });
+    renderApp('/tickets/new');
+
+    expect(await screen.findByText('(vous)')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Changer' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Charles Client/ }));
+    await userEvent.type(screen.getByLabelText('Sujet'), 'Appel téléphonique');
+    await userEvent.type(screen.getByLabelText('Description'), 'Le client ne peut plus se connecter.');
+    await userEvent.click(screen.getByRole('button', { name: 'Créer le ticket' }));
+
+    await waitFor(() =>
+      expect(calls).toContainEqual(
+        expect.objectContaining({ method: 'POST', path: '/tickets', body: expect.objectContaining({ requesterId: external.id }) }),
+      ),
+    );
   });
 });
