@@ -164,6 +164,11 @@ export const ticketRoutes: FastifyPluginAsync<{ tickets: TicketService }> = asyn
     return tickets.merge(request.currentUser, id, targetId);
   });
 
+  app.get('/:id/requester-history', async (request) => {
+    const { id } = idParams.parse(request.params);
+    return tickets.requesterHistory(request.currentUser, id);
+  });
+
   app.get('/:id/audit', async (request) => {
     const { id } = idParams.parse(request.params);
     return tickets.auditTrail(request.currentUser, id);

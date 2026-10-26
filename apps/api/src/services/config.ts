@@ -8,6 +8,7 @@ import {
   IMPACTS,
   LIST_COLUMNS,
   normalizeLayout,
+  normalizeTicketPage,
   OPTION_FIELD_LABELS,
   PRIORITIES,
   TICKET_FORM_FIELDS,
@@ -25,6 +26,7 @@ export const SETTING_KEYS = {
   priorityMatrix: 'priorityMatrix',
   ticketForm: 'ticketForm',
   listColumns: 'listColumns',
+  ticketPage: 'ticketPage',
   slaPolicy: 'slaPolicy',
 } as const;
 
@@ -147,6 +149,10 @@ export class ConfigService {
   async ticketForm() {
     const saved = await this.setting(SETTING_KEYS.ticketForm);
     return saved ? normalizeLayout(saved, TICKET_FORM_FIELDS) : DEFAULT_TICKET_FORM;
+  }
+
+  async ticketPage() {
+    return normalizeTicketPage(await this.setting(SETTING_KEYS.ticketPage));
   }
 
   async listColumns() {

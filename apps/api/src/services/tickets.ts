@@ -220,6 +220,23 @@ export class TicketService {
     return this.toDto(await this.findVisible(user, id), await this.d.sla.policy());
   }
 
+  /** Autres tickets du même demandeur (réservé au support), du plus récent au plus ancien. */
+  async requesterHistory(user: CurrentUser, id: number) {
+    ensure(user, 'ticket:read:all');
+    const { requesterId } = await this.findVisible(user, id);
+    const where = { requesterId, id: { not: id } };
+    const [items, total] = await Promise.all([
+      this.prisma.ticket.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: { id: true, subject: true, status: true, priority: true, createdAt: true },
+      }),
+      this.prisma.ticket.count({ where }),
+    ]);
+    return { items, total };
+  }
+
   /** Détail avec les tickets rattachés, pour la page d'un ticket référent. */
   async getDetail(user: CurrentUser, id: number) {
     const [ticket, children, devLinks] = await Promise.all([

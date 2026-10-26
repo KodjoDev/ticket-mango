@@ -1,5 +1,6 @@
 import type {
   AlertKindName,
+  PageBlockItem,
   Report,
   ReleaseCategory,
   DevProviderName,
@@ -20,6 +21,7 @@ import type {
   Agent,
   AlertChannel,
   AppConfig,
+  RequesterHistoryEntry,
   CustomField,
   CustomFieldInput,
   PurgeResult,
@@ -225,6 +227,8 @@ export const api = {
   notifyRelease: (id: string) =>
     request<{ requesters: number; sent: number; failed: number; delivered: boolean }>('POST', `/releases/${id}/notify`),
 
+  requesterHistory: (ticketId: number) =>
+    request<{ items: RequesterHistoryEntry[]; total: number }>('GET', `/tickets/${ticketId}/requester-history`),
   report: (from: string, to: string) => request<Report>('GET', `/reports?from=${from}&to=${to}`),
 
   spellcheck: (text: string) => request<{ issues: SpellcheckIssue[] }>('POST', '/spellcheck', { text }),
@@ -255,6 +259,7 @@ export const adminApi = {
 
   savePriorityMatrix: (matrix: PriorityMatrix) => request<PriorityMatrix>('PUT', '/admin/priority-matrix', matrix),
   saveTicketForm: (layout: LayoutItem<TicketFormField>[]) => request('PUT', '/admin/layout/ticket-form', layout),
+  saveTicketPage: (layout: PageBlockItem[]) => request('PUT', '/admin/layout/ticket-page', layout),
   saveListColumns: (layout: LayoutItem<ListColumn>[]) => request('PUT', '/admin/layout/list-columns', layout),
 
   createTag: (input: { name: string; color: string }) => request<Tag>('POST', '/admin/tags', input),

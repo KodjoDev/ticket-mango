@@ -1,4 +1,5 @@
 import type {
+  PageBlockItem,
   CustomFieldKind,
   CustomValues,
   CompiledNotes,
@@ -213,6 +214,7 @@ export interface AppConfig {
   listColumns: LayoutItem<ListColumn>[];
   slaPolicy: SlaPolicy;
   customFields: CustomField[];
+  ticketPage: PageBlockItem[];
   groups: GroupRef[];
   features: { spellcheck: boolean; meetingProvider: string };
 }
@@ -502,4 +504,12 @@ export interface PurgeResult {
   cutoff: string;
   users: number;
   emailLogs: number;
+}
+
+export interface RequesterHistoryEntry {
+  id: number;
+  subject: string;
+  status: TicketStatus;
+  priority: Priority;
+  createdAt: string;
 }
