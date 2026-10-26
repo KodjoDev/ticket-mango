@@ -20,6 +20,7 @@ export const FIELD_LABELS: Record<string, string> = {
   urgency: 'Urgence',
   priority: 'Priorité',
   priorityOverridden: 'Priorité forcée',
+  requester: 'Demandeur',
   assigneeId: 'Assigné',
   status: 'Statut',
   tags: 'Tags',

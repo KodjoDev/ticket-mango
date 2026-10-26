@@ -6,6 +6,7 @@ import type { Comment, Macro, Meeting, Ticket } from '../api/types';
 import { useAuth, useCurrentUser } from '../auth/AuthContext';
 import { useConfig } from '../config/ConfigContext';
 import { currentMeeting, macroContext } from '../macroContext';
+import { AttachmentList, FilePicker } from './Attachments';
 import { SpellcheckPanel } from './Spellcheck';
 import { Avatar, ErrorMessage, formatDate } from './ui';
 
@@ -47,6 +48,8 @@ export function Conversation({ ticket, comments, meetings, draft }: Props) {
   // Un développeur n'écrit que des notes internes.
   const [isInternal, setIsInternal] = useState(!canPublic);
   const [macro, setMacro] = useState<Macro | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const macros = useQuery({ queryKey: ['macros'], queryFn: api.macros, enabled: can('ticket:qualify'), staleTime: 60_000 });
 
@@ -59,10 +62,12 @@ export function Conversation({ ticket, comments, meetings, draft }: Props) {
 
   const send = useMutation({
     mutationFn: async (): Promise<unknown> =>
-      macro ? api.applyMacro(macro.id, ticket.id, body) : api.addComment(ticket.id, body, isInternal),
+      macro ? api.applyMacro(macro.id, ticket.id, body) : api.addComment(ticket.id, body, isInternal, files),
     onSuccess: () => {
       setBody('');
       setMacro(null);
+      setFiles([]);
+      setFileError(null);
       void queryClient.invalidateQueries({ queryKey: ['ticket', ticket.id] });
       void queryClient.invalidateQueries({ queryKey: ['tickets'] });
       void queryClient.invalidateQueries({ queryKey: ['views'] });
@@ -96,9 +101,27 @@ export function Conversation({ ticket, comments, meetings, draft }: Props) {
                 <div className="comment-meta">
                   <strong>{c.author.name}</strong>
                   {c.isInternal && <span className="badge internal-badge">Note interne</span>}
+                  {c.channel === 'EMAIL' && <span className="badge channel-badge">par e-mail</span>}
                   <span className="muted small">{formatDate(c.createdAt)}</span>
+                  {c.outbound?.map((o) => (
+                    <span
+                      key={o.toAddress + o.status}
+                      className={`delivery delivery-${o.status.toLowerCase()}`}
+                      title={o.lastError ?? (o.sentAt ? `Envoyé le ${formatDate(o.sentAt)}` : undefined)}
+                    >
+                      {
+                        {
+                          SENT: `✓ envoyé à ${o.toAddress}`,
+                          PENDING: `envoi en cours à ${o.toAddress}`,
+                          FAILED: `✗ échec d’envoi à ${o.toAddress}`,
+                          SKIPPED: `non envoyé à ${o.toAddress} (SMTP non configuré)`,
+                        }[o.status]
+                      }
+                    </span>
+                  ))}
                 </div>
                 <p className="prewrap">{c.body}</p>
+                <AttachmentList attachments={c.attachments} />
               </div>
             </li>
           ))}
@@ -147,6 +170,7 @@ export function Conversation({ ticket, comments, meetings, draft }: Props) {
             </div>
           )}
           <ErrorMessage error={send.error} />
+          {fileError && <div className="alert">{fileError}</div>}
           <textarea
             aria-label="Votre message"
             placeholder={isInternal ? 'Note visible uniquement par le support' : 'Répondre au demandeur'}
@@ -157,7 +181,16 @@ export function Conversation({ ticket, comments, meetings, draft }: Props) {
             onChange={(e) => setBody(e.target.value)}
           />
           <div className="actions composer-footer">
-            {config.features.spellcheck && <SpellcheckPanel text={body} onChange={setBody} />}
+            <div className="composer-tools">
+              {/* Une macro s'applique sans pièce jointe : on retire d'abord la macro pour joindre un fichier. */}
+              <FilePicker
+                files={files}
+                onChange={setFiles}
+                disabled={!!macro}
+                onTooLarge={(names) => setFileError(`Trop volumineux (25 Mo maximum) : ${names.join(', ')}`)}
+              />
+              {config.features.spellcheck && <SpellcheckPanel text={body} onChange={setBody} />}
+            </div>
             <button type="submit" className="primary" disabled={send.isPending || !body.trim()}>
               {macro ? 'Envoyer et appliquer' : isInternal ? 'Ajouter la note' : 'Envoyer'}
             </button>

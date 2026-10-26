@@ -15,7 +15,13 @@ describeDb('macros', () => {
     const agent = await actor(ctx, 'AGENT_N1');
     const client = await actor(ctx, 'EXTERNAL_USER');
     const names = (await agent.get('/macros')).json().map((m: { name: string }) => m.name);
-    expect(names).toEqual(['Invitation Meet', 'Proposition de créneaux', "Demande d'informations complémentaires", 'Correctif livré']);
+    expect(names).toEqual([
+      'Invitation Meet',
+      'Proposition de créneaux',
+      "Demande d'informations complémentaires",
+      'Correctif livré',
+      'Accusé de réception (e-mail)',
+    ]);
     expect((await client.get('/macros')).statusCode).toBe(403);
   });
 

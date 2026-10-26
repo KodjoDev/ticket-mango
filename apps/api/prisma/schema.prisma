@@ -33,6 +33,31 @@ enum SlaState {
   DONE
 }
 
+/// Canal d'arrivée d'un ticket ou d'un message (reporting par canal, CdC §7.2).
+enum Channel {
+  WEB
+  EMAIL
+}
+
+enum InboundStatus {
+  PROCESSED
+  DUPLICATE
+  AUTO_REPLY
+  /// Newsletter, notification de réseau social, envoi de masse (en-têtes de liste de diffusion).
+  BULK
+  SPAM
+  LOOP
+  ERROR
+}
+
+enum OutboundStatus {
+  PENDING
+  SENT
+  FAILED
+  /// Aucun serveur SMTP configuré : le message a seulement été journalisé.
+  SKIPPED
+}
+
 enum MeetingStatus {
   /// Créneaux proposés, en attente du choix du demandeur.
   PROPOSED
@@ -84,7 +109,8 @@ model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
   name         String
-  passwordHash String
+  /// Absent pour un contact créé depuis un e-mail : aucune connexion possible.
+  passwordHash String?
   role         Role
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
@@ -135,19 +161,29 @@ model Ticket {
   lastAgentReplyAt     DateTime?
   /// Vrai quand le demandeur s'est exprimé après la dernière réponse du support.
   awaitingAgent        Boolean      @default(false)
+  channel              Channel      @default(WEB)
+  /// Boîte de réception d'origine : les réponses partent depuis son adresse.
+  mailboxId            String?      @db.Uuid
+  mailbox              Mailbox?     @relation(fields: [mailboxId], references: [id], onDelete: SetNull)
+  /// Ticket doublon fusionné dans un autre : les e-mails suivants y sont redirigés.
+  mergedIntoId         Int?
+  mergedInto           Ticket?      @relation("merge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedFrom           Ticket[]     @relation("merge")
   firstResponseAt      DateTime?
   resolvedAt           DateTime?
   closedAt             DateTime?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
 
-  comments      Comment[]
-  auditLogs     AuditLog[]
-  tags          TicketTag[]
-  meetings      Meeting[]
-  slaPauses     SlaPause[]
-  slaAlerts     SlaAlert[]
-  notifications Notification[]
+  comments       Comment[]
+  auditLogs      AuditLog[]
+  tags           TicketTag[]
+  meetings       Meeting[]
+  slaPauses      SlaPause[]
+  slaAlerts      SlaAlert[]
+  notifications  Notification[]
+  attachments    Attachment[]
+  outboundEmails OutboundEmail[]
 
   @@index([status])
   @@index([groupId])
@@ -160,15 +196,20 @@ model Ticket {
 }
 
 model Comment {
-  id         String   @id @default(uuid()) @db.Uuid
-  ticketId   Int
-  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  authorId   String   @db.Uuid
-  author     User     @relation(fields: [authorId], references: [id])
-  body       String
+  id          String          @id @default(uuid()) @db.Uuid
+  ticketId    Int
+  ticket      Ticket          @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId    String          @db.Uuid
+  author      User            @relation(fields: [authorId], references: [id])
+  body        String
   /// Note interne : invisible pour les utilisateurs externes.
-  isInternal Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  isInternal  Boolean         @default(false)
+  channel     Channel         @default(WEB)
+  /// Message-ID de l'e-mail reçu ou envoyé pour ce message (fil de discussion).
+  messageId   String?         @unique
+  attachments Attachment[]
+  outbound    OutboundEmail[]
+  createdAt   DateTime        @default(now())
 
   @@index([ticketId, createdAt])
 }
@@ -320,9 +361,10 @@ model Group {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  members GroupMember[]
-  tickets Ticket[]
-  rules   RoutingRule[]
+  members   GroupMember[]
+  tickets   Ticket[]
+  rules     RoutingRule[]
+  mailboxes Mailbox[]
 }
 
 model GroupMember {
@@ -386,4 +428,101 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, readAt, createdAt])
+}
+
+/// Boîte de réception partagée (support@, incidents@, bugs@…), relevée en IMAP et/ou alimentée par webhook.
+model Mailbox {
+  id              String    @id @default(uuid()) @db.Uuid
+  name            String
+  address         String    @unique
+  isActive        Boolean   @default(true)
+  imapHost        String?
+  imapPort        Int?
+  imapSecure      Boolean   @default(true)
+  imapUser        String?
+  /// Mot de passe chiffré (AES-256-GCM) ; jamais renvoyé par l'API.
+  imapPasswordEnc String?
+  imapFolder      String    @default("INBOX")
+  /// Curseur IMAP : UIDVALIDITY du dossier et dernier UID traité.
+  uidValidity     BigInt?
+  lastUid         Int?
+  /// Jeton secret de l'URL de réception webhook.
+  webhookToken    String    @unique
+  /// Valeurs appliquées aux tickets créés par cette boîte (ex. bugs@ → type Bug).
+  defaultType     String?
+  defaultGroupId  String?   @db.Uuid
+  defaultGroup    Group?    @relation(fields: [defaultGroupId], references: [id], onDelete: SetNull)
+  lastCheckedAt   DateTime?
+  lastError       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tickets Ticket[]
+  inbound InboundEmail[]
+}
+
+/// Journal des e-mails reçus : un par Message-ID (déduplication), avec le sort qui lui a été réservé.
+model InboundEmail {
+  id          String        @id @default(uuid()) @db.Uuid
+  mailboxId   String?       @db.Uuid
+  mailbox     Mailbox?      @relation(fields: [mailboxId], references: [id], onDelete: SetNull)
+  messageId   String        @unique
+  fromAddress String
+  subject     String
+  status      InboundStatus
+  reason      String?
+  ticketId    Int?
+  commentId   String?       @db.Uuid
+  size        Int
+  /// Message brut conservé pour les e-mails écartés ou en erreur (retraitement possible).
+  rawKey      String?
+  receivedAt  DateTime      @default(now())
+
+  @@index([receivedAt])
+  @@index([fromAddress, receivedAt])
+}
+
+/// File d'envoi des e-mails (réponses, accusés de réception), avec reprise en cas d'échec.
+model OutboundEmail {
+  id            String         @id @default(uuid()) @db.Uuid
+  ticketId      Int
+  ticket        Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  commentId     String?        @db.Uuid
+  comment       Comment?       @relation(fields: [commentId], references: [id], onDelete: SetNull)
+  fromAddress   String
+  toAddress     String
+  subject       String
+  body          String
+  messageId     String         @unique
+  inReplyTo     String?
+  references    String?
+  status        OutboundStatus @default(PENDING)
+  attempts      Int            @default(0)
+  nextAttemptAt DateTime       @default(now())
+  lastError     String?
+  sentAt        DateTime?
+  createdAt     DateTime       @default(now())
+
+  @@index([status, nextAttemptAt])
+  @@index([ticketId])
+  @@index([commentId])
+}
+
+model Attachment {
+  id           String   @id @default(uuid()) @db.Uuid
+  ticketId     Int
+  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  /// Message auquel la pièce est jointe ; null pour celles de la demande initiale.
+  commentId    String?  @db.Uuid
+  comment      Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  filename     String
+  contentType  String
+  size         Int
+  sha256       String
+  storageKey   String   @unique
+  uploadedById String?  @db.Uuid
+  createdAt    DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([commentId])
 }

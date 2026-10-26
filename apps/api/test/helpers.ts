@@ -3,6 +3,8 @@ import type { Role } from '@ticketing/shared';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app';
 import { hashPassword } from '../src/lib/password';
+import { MemoryTransport } from '../src/services/email/smtp';
+import { MemoryFileStorage } from '../src/services/storage';
 
 /** Les tests d'intégration exigent une base PostgreSQL migrée (DATABASE_URL). */
 export const describeDb = describe.skipIf(!process.env.DATABASE_URL);
@@ -12,16 +14,23 @@ export const PASSWORD = 'mot-de-passe-de-test';
 export interface TestContext {
   app: FastifyInstance;
   prisma: PrismaClient;
+  storage: MemoryFileStorage;
+  /** E-mails « envoyés » pendant le test. */
+  mail: MemoryTransport;
 }
 
 export async function setup(): Promise<TestContext> {
   const prisma = new PrismaClient();
+  const storage = new MemoryFileStorage();
+  const mail = new MemoryTransport();
   const app = await buildApp({
     prisma,
+    storage,
+    mailTransport: mail,
     config: { JWT_SECRET: 'x'.repeat(32), JWT_EXPIRES_IN: '1h', LOGIN_RATE_LIMIT: 10_000, COOKIE_SECURE: false },
   });
   await app.ready();
-  return { app, prisma };
+  return { app, prisma, storage, mail };
 }
 
 export async function teardown({ app, prisma }: TestContext) {
@@ -57,11 +66,17 @@ const DEFAULT_RULES = [
   { name: 'Par défaut', conditions: {}, groupId: GROUP_IDS.n1 },
 ];
 
-const SEEDED_MACROS = ['Invitation Meet', 'Proposition de créneaux', "Demande d'informations complémentaires", 'Correctif livré'];
+const SEEDED_MACROS = [
+  'Invitation Meet',
+  'Proposition de créneaux',
+  "Demande d'informations complémentaires",
+  'Correctif livré',
+  'Accusé de réception (e-mail)',
+];
 
 export async function resetDb(prisma: PrismaClient) {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE "AuditLog", "Comment", "TicketTag", "Tag", "MeetingAttendee", "MeetingSlot", "Meeting", "Notification", "SlaAlert", "SlaPause", "GroupMember", "RoutingRule", "Group", "Ticket", "User", "Setting", "View" RESTART IDENTITY CASCADE',
+    'TRUNCATE "Attachment", "OutboundEmail", "InboundEmail", "Mailbox", "AuditLog", "Comment", "TicketTag", "Tag", "MeetingAttendee", "MeetingSlot", "Meeting", "Notification", "SlaAlert", "SlaPause", "GroupMember", "RoutingRule", "Group", "Ticket", "User", "Setting", "View" RESTART IDENTITY CASCADE',
   );
   // Groupes et règles de routage tels que créés par la migration.
   await prisma.group.createMany({ data: DEFAULT_GROUPS.map((g, position) => ({ ...g, position })) });
@@ -102,6 +117,8 @@ export async function actor(ctx: TestContext, role: Role) {
     ctx.app.inject({ method, url, payload, headers: { authorization: `Bearer ${token}` } });
   return {
     user,
+    /** En-tête d'autorisation, pour les requêtes construites à la main (multipart). */
+    token: `Bearer ${token}`,
     get: (url: string) => request('GET', url),
     post: (url: string, payload?: object) => request('POST', url, payload),
     patch: (url: string, payload?: object) => request('PATCH', url, payload),

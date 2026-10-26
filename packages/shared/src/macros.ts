@@ -14,6 +14,8 @@ export interface MacroActions {
 export const SYSTEM_MACRO_KEYS = {
   meetingScheduled: 'meeting_scheduled',
   meetingProposal: 'meeting_proposal',
+  /** Accusé de réception envoyé à la création d'un ticket par e-mail. */
+  emailAcknowledgement: 'email_acknowledgement',
 } as const;
 
 export const MACRO_VARIABLES = [

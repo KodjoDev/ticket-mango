@@ -18,6 +18,19 @@ const configSchema = z.object({
   MEETING_PROVIDER: z.enum(['demo']).default('demo'),
   /** Serveur LanguageTool auto-hébergé ; sans valeur, la correction grammaticale est désactivée. */
   LANGUAGETOOL_URL: z.string().url().optional(),
+  /** URL publique de l'API (webhooks de réception) ; par défaut PUBLIC_APP_URL + /api. */
+  PUBLIC_API_URL: z.string().url().optional(),
+  /** Clé de chiffrement des secrets stockés (32 octets en base64 : openssl rand -base64 32). */
+  SECRET_KEY: z.string().optional(),
+  /** Envoi SMTP, ex. smtp://utilisateur:motdepasse@smtp.exemple.fr:587 ; sans valeur, les e-mails sont journalisés. */
+  SMTP_URL: z.string().url().optional(),
+  /** Adresse d'expédition à défaut de boîte de réception configurée. */
+  EMAIL_FROM: z.string().email().optional(),
+  EMAIL_FROM_NAME: z.string().default('Support'),
+  /** Domaine des Message-ID ; par défaut celui de PUBLIC_APP_URL. */
+  EMAIL_DOMAIN: z.string().optional(),
+  /** Dossier des pièces jointes (stockage local). */
+  STORAGE_DIR: z.string().default('./data'),
   /** Cookie de session réservé à HTTPS. Activé par défaut en production. */
   COOKIE_SECURE: z.enum(['true', 'false']).optional().transform((v) => (v === undefined ? undefined : v === 'true')),
 });
