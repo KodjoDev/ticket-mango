@@ -14,6 +14,7 @@ export const ADMIN_SECTIONS: { path: string; label: string; permission: Permissi
   { path: 'qualification', label: 'Qualification', permission: 'settings:manage' },
   { path: 'priority', label: 'Matrice de priorité', permission: 'settings:manage' },
   { path: 'tags', label: 'Tags', permission: 'settings:manage' },
+  { path: 'fields', label: 'Champs du ticket', permission: 'settings:manage' },
   { path: 'layout', label: 'Mise en page', permission: 'settings:manage' },
   { path: 'views', label: 'Vues', permission: 'settings:manage' },
   { path: 'macros', label: 'Macros', permission: 'settings:manage' },

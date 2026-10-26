@@ -1,6 +1,10 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import {
   LIST_COLUMNS,
+  LOCKED_PAGE_BLOCKS,
+  PAGE_BLOCK_LABELS,
+  PAGE_BLOCKS,
+  PAGE_COLUMNS,
   OPTION_FIELD_TICKET_KEY,
   OPTION_FIELDS,
   OPTION_KEY_PATTERN,
@@ -147,6 +151,25 @@ export const adminRoutes: FastifyPluginAsync<{ prisma: PrismaClient; config: Con
       request.currentUser.id,
       'admin.layout.ticket_form.updated',
       (tx) => config.saveSetting(tx, SETTING_KEYS.ticketForm, layout),
+      () => layout,
+    );
+    return layout;
+  });
+
+  app.put('/layout/ticket-page', async (request) => {
+    const layout = z
+      .array(z.object({ key: z.enum(PAGE_BLOCKS), visible: z.boolean(), column: z.enum(PAGE_COLUMNS) }).strict())
+      .refine((items) => items.length === PAGE_BLOCKS.length && new Set(items.map((i) => i.key)).size === PAGE_BLOCKS.length, {
+        message: 'Chaque bloc doit apparaître une et une seule fois',
+      })
+      .parse(request.body);
+    for (const key of LOCKED_PAGE_BLOCKS) {
+      if (!layout.find((i) => i.key === key)?.visible) throw badRequest(`Le bloc « ${PAGE_BLOCK_LABELS[key]} » doit rester affiché`);
+    }
+    await withAudit(
+      request.currentUser.id,
+      'admin.layout.ticket_page.updated',
+      (tx) => config.saveSetting(tx, SETTING_KEYS.ticketPage, layout),
       () => layout,
     );
     return layout;

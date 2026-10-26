@@ -8,6 +8,7 @@ import {
   isOpenStatus,
   isSlaPausedStatus,
   TICKET_STATUSES,
+  type CustomValues,
   type Impact,
   type Permission,
   type Priority,
@@ -79,6 +80,8 @@ export interface CreateTicketInput {
   /** Sans groupe explicite, les règles de routage le déterminent. */
   groupId?: string | null;
   tagIds?: string[];
+  /** Champs personnalisés, par clé. */
+  customValues?: Record<string, unknown>;
 }
 
 export interface UpdateTicketInput {
@@ -97,6 +100,8 @@ export interface UpdateTicketInput {
   groupId?: string | null;
   /** Remplace l'ensemble des tags du ticket. */
   tagIds?: string[];
+  /** Fusionné avec les valeurs existantes : seuls les champs fournis changent. */
+  customValues?: Record<string, unknown>;
 }
 
 export interface ListTicketsFilters {
@@ -120,7 +125,7 @@ export interface ListTicketsFilters {
 
 type Filters = Omit<ListTicketsFilters, 'page' | 'pageSize'>;
 
-const QUALIFICATION_FIELDS = ['type', 'component', 'environment', 'impact', 'urgency', 'tagIds'] as const;
+const QUALIFICATION_FIELDS = ['type', 'component', 'environment', 'impact', 'urgency', 'tagIds', 'customValues'] as const;
 const OPEN_STATUSES = TICKET_STATUSES.filter(isOpenStatus);
 
 /** Plus court chemin du workflow entre deux statuts ouverts (RESOLVED et CLOSED exclus), sans le point de départ. */
@@ -213,6 +218,23 @@ export class TicketService {
 
   async getVisible(user: CurrentUser, id: number) {
     return this.toDto(await this.findVisible(user, id), await this.d.sla.policy());
+  }
+
+  /** Autres tickets du même demandeur (réservé au support), du plus récent au plus ancien. */
+  async requesterHistory(user: CurrentUser, id: number) {
+    ensure(user, 'ticket:read:all');
+    const { requesterId } = await this.findVisible(user, id);
+    const where = { requesterId, id: { not: id } };
+    const [items, total] = await Promise.all([
+      this.prisma.ticket.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: { id: true, subject: true, status: true, priority: true, createdAt: true },
+      }),
+      this.prisma.ticket.count({ where }),
+    ]);
+    return { items, total };
   }
 
   /** Détail avec les tickets rattachés, pour la page d'un ticket référent. */
@@ -339,6 +361,11 @@ export class TicketService {
     await this.d.notifications.notify(tx, [assigneeId], { ticketId: ticket.id, kind, message });
   }
 
+  /** Clés des champs personnalisés visibles du demandeur ; les autres sont réservés au support. */
+  async requesterFieldKeys(): Promise<Set<string>> {
+    return new Set((await this.d.config.customFields()).filter((f) => f.forRequester).map((f) => f.key));
+  }
+
   async create(user: CurrentUser, input: CreateTicketInput, system?: SystemCreateOptions) {
     if (input.priority !== undefined) ensure(user, 'ticket:priority:override');
     if (input.tagIds?.length) ensure(user, 'ticket:qualify');
@@ -360,6 +387,7 @@ export class TicketService {
     await this.d.config.assertOptionUsable('ENVIRONMENT', input.environment);
     const tagIds = [...new Set(input.tagIds ?? [])];
     await this.d.config.assertTagsUsable(tagIds);
+    const custom = await this.d.config.resolveCustomValues(input.customValues, { current: undefined, requesterOnly: !isStaff(user) });
 
     const impact = input.impact ?? 'INDIVIDUAL';
     const urgency = input.urgency ?? 'MEDIUM';
@@ -393,6 +421,7 @@ export class TicketService {
           ...(openedByCustomer && { lastRequesterReplyAt: new Date(), awaitingAgent: true }),
           channel: system?.channel ?? 'WEB',
           mailboxId: system?.mailboxId ?? null,
+          customValues: custom!.values,
           tags: { create: tagIds.map((tagId) => ({ tagId })) },
         },
         include: ticketInclude,
@@ -408,6 +437,7 @@ export class TicketService {
             assigneeId,
             groupId,
             tags: ticket.tags.map((t) => t.tag.name),
+            ...(Object.keys(custom!.values).length > 0 && { customFields: Object.keys(custom!.values) }),
             ...(routedGroup && { routedTo: routedGroup.name }),
           },
         },
@@ -452,7 +482,11 @@ export class TicketService {
       );
     }
 
-    const { priority: priorityInput, tagIds: _tagIds, ...fields } = input;
+    const custom = await this.d.config.resolveCustomValues(input.customValues, {
+      current: (current.customValues ?? {}) as CustomValues,
+      requesterOnly: false,
+    });
+    const { priority: priorityInput, tagIds: _tagIds, customValues: _custom, ...fields } = input;
     const next: Partial<Ticket> = { ...fields };
     const impact = input.impact ?? current.impact;
     const urgency = input.urgency ?? current.urgency;
@@ -467,6 +501,10 @@ export class TicketService {
     }
 
     const changes = diff(current, next);
+    if (custom && Object.keys(custom.changes).length > 0) {
+      next.customValues = custom.values;
+      Object.assign(changes, custom.changes);
+    }
     // La description peut être longue et contenir des données personnelles : on ne journalise que le fait qu'elle a changé.
     if (changes.description) changes.description = { from: '[modifié]', to: '[modifié]' };
     // Le demandeur peut être un contact externe, inconnu de l'interface : on journalise son nom et son adresse.
@@ -492,7 +530,7 @@ export class TicketService {
       // updatedAt est forcé pour que le seul changement de tags compte aussi comme une modification.
       const { count } = await tx.ticket.updateMany({
         where: { id, updatedAt: current.updatedAt },
-        data: { ...next, updatedAt: new Date() },
+        data: { ...next, customValues: next.customValues as Prisma.InputJsonObject | undefined, updatedAt: new Date() },
       });
       if (count === 0) throw conflict('Le ticket a été modifié entre-temps, veuillez recharger');
       if (tagsChanged) {

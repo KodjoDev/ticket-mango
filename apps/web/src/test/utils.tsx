@@ -2,7 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { AppRoutes, createQueryClient } from '../App';
-import { computeSla, DEFAULT_LIST_COLUMNS, DEFAULT_PRIORITY_MATRIX, DEFAULT_SLA_POLICY, DEFAULT_TICKET_FORM } from '@ticketing/shared';
+import { computeSla, DEFAULT_LIST_COLUMNS, DEFAULT_PRIORITY_MATRIX, DEFAULT_SLA_POLICY, DEFAULT_TICKET_FORM, DEFAULT_TICKET_PAGE } from '@ticketing/shared';
 import type { AppConfig, FieldOption, SlaStatusDto, TicketDetail, User } from '../api/types';
 import { AuthProvider } from '../auth/AuthContext';
 
@@ -36,6 +36,8 @@ export const testConfig: AppConfig = {
   ticketForm: DEFAULT_TICKET_FORM,
   listColumns: DEFAULT_LIST_COLUMNS,
   slaPolicy: DEFAULT_SLA_POLICY,
+  customFields: [],
+  ticketPage: DEFAULT_TICKET_PAGE,
   groups: [
     { id: 'g-n1', name: 'Support N1', isActive: true, memberIds: ['u-agent'] },
     { id: 'g-n2', name: 'Support N2', isActive: true, memberIds: [] },
@@ -139,6 +141,7 @@ export function makeTicket(overrides: Partial<TicketDetail> = {}): TicketDetail 
     children: [],
     devLinks: [],
     fixedInVersion: null,
+    customValues: {},
     awaitingAgent: false,
     lastRequesterReplyAt: null,
     lastAgentReplyAt: null,

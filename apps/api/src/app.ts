@@ -19,6 +19,7 @@ import { publicReleaseRoutes, releaseRoutes } from './routes/releases';
 import { ReleaseService } from './services/releases';
 import { privacyRoutes, reportRoutes } from './routes/privacy-reports';
 import { PrivacyService } from './services/privacy';
+import { customFieldAdminRoutes } from './routes/custom-fields-admin';
 import { attachmentRoutes } from './routes/attachments';
 import { authRoutes } from './routes/auth';
 import { configRoutes } from './routes/config';
@@ -215,6 +216,7 @@ export async function buildApp({
   await app.register(macroAdminRoutes, { prefix: '/admin/macros', prisma, macros });
   const publicApiUrl = config.PUBLIC_API_URL ?? `${publicAppUrl.replace(/\/$/, '')}/api`;
   await app.register(devAdminRoutes, { prefix: '/admin', prisma, secrets, publicApiUrl });
+  await app.register(customFieldAdminRoutes, { prefix: '/admin', prisma });
   await app.register(privacyRoutes, { prefix: '/admin/privacy', privacy: new PrivacyService(prisma, storage) });
   await app.register(alertAdminRoutes, { prefix: '/admin', prisma, secrets });
   await app.register(emailAdminRoutes, {

@@ -138,6 +138,8 @@ model Ticket {
   type                 String       @default("QUESTION")
   component            String?
   environment          String?
+  /// Valeurs des champs personnalisés, par clé de CustomField.
+  customValues         Json         @default("{}")
   impact               Impact       @default(INDIVIDUAL)
   urgency              Urgency      @default(MEDIUM)
   priority             Priority
@@ -719,4 +721,31 @@ model ReleaseItem {
 
   @@id([releaseId, ticketId])
   @@index([ticketId])
+}
+
+enum CustomFieldKind {
+  TEXT
+  LONGTEXT
+  NUMBER
+  DATE
+  SELECT
+  CHECKBOX
+}
+
+/// Champ de ticket défini par l'administrateur. Archivé (jamais supprimé) pour conserver les valeurs existantes.
+model CustomField {
+  id           String          @id @default(uuid()) @db.Uuid
+  /// Clé stable des valeurs stockées sur les tickets ; non modifiable.
+  key          String          @unique
+  label        String
+  kind         CustomFieldKind
+  /// Choix d'une liste (SELECT), tableau de chaînes.
+  options      Json            @default("[]")
+  /// Obligatoire à la création du ticket.
+  required     Boolean         @default(false)
+  /// Visible et saisissable par le demandeur (utilisateur externe) à la création.
+  forRequester Boolean         @default(false)
+  position     Int
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
 }

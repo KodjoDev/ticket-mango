@@ -1,5 +1,6 @@
 import type {
   AlertKindName,
+  PageBlockItem,
   Report,
   ReleaseCategory,
   DevProviderName,
@@ -20,6 +21,9 @@ import type {
   Agent,
   AlertChannel,
   AppConfig,
+  RequesterHistoryEntry,
+  CustomField,
+  CustomFieldInput,
   PurgeResult,
   PublicRelease,
   ReleaseCandidate,
@@ -223,6 +227,8 @@ export const api = {
   notifyRelease: (id: string) =>
     request<{ requesters: number; sent: number; failed: number; delivered: boolean }>('POST', `/releases/${id}/notify`),
 
+  requesterHistory: (ticketId: number) =>
+    request<{ items: RequesterHistoryEntry[]; total: number }>('GET', `/tickets/${ticketId}/requester-history`),
   report: (from: string, to: string) => request<Report>('GET', `/reports?from=${from}&to=${to}`),
 
   spellcheck: (text: string) => request<{ issues: SpellcheckIssue[] }>('POST', '/spellcheck', { text }),
@@ -253,6 +259,7 @@ export const adminApi = {
 
   savePriorityMatrix: (matrix: PriorityMatrix) => request<PriorityMatrix>('PUT', '/admin/priority-matrix', matrix),
   saveTicketForm: (layout: LayoutItem<TicketFormField>[]) => request('PUT', '/admin/layout/ticket-form', layout),
+  saveTicketPage: (layout: PageBlockItem[]) => request('PUT', '/admin/layout/ticket-page', layout),
   saveListColumns: (layout: LayoutItem<ListColumn>[]) => request('PUT', '/admin/layout/list-columns', layout),
 
   createTag: (input: { name: string; color: string }) => request<Tag>('POST', '/admin/tags', input),
@@ -299,6 +306,11 @@ export const adminApi = {
   exportUser: (id: string) => request<unknown>('GET', `/admin/privacy/users/${id}/export`),
   anonymizeUser: (id: string, eraseContent: boolean) => request<void>('POST', `/admin/privacy/users/${id}/anonymize`, { eraseContent }),
   purge: (months: number, dryRun: boolean) => request<PurgeResult>('POST', '/admin/privacy/purge', { months, dryRun }),
+  customFields: () => request<CustomField[]>('GET', '/admin/custom-fields'),
+  createCustomField: (input: CustomFieldInput) => request<CustomField>('POST', '/admin/custom-fields', input),
+  updateCustomField: (id: string, input: Partial<Pick<CustomField, 'label' | 'options' | 'required' | 'forRequester' | 'isActive'>>) =>
+    request<CustomField>('PATCH', `/admin/custom-fields/${id}`, input),
+  reorderCustomFields: (ids: string[]) => request<CustomField[]>('PUT', '/admin/custom-fields/order', { ids }),
   alertChannels: () => request<AlertChannel[]>('GET', '/admin/alert-channels'),
   createAlertChannel: (input: { kind: AlertKindName; name: string; target: string; isActive: boolean }) =>
     request<AlertChannel>('POST', '/admin/alert-channels', input),
