@@ -1,4 +1,6 @@
 import type {
+  CompiledNotes,
+  ReleaseCategory,
   AlertKindName,
   IncidentSeverity,
   IncidentStatus,
@@ -443,4 +445,42 @@ export interface AlertChannel {
   name: string;
   isActive: boolean;
   hasTarget: boolean;
+}
+
+export interface ReleaseSummary {
+  id: string;
+  version: string;
+  title: string | null;
+  status: 'DRAFT' | 'PUBLISHED';
+  publishedAt: string | null;
+  notifiedCount: number | null;
+  _count: { items: number };
+}
+
+export interface ReleaseDetail extends Omit<ReleaseSummary, '_count'> {
+  items: { ticketId: number; category: ReleaseCategory; summary: string | null; ticket: { id: number; subject: string; status: string; devLinks: { externalKey: string; url: string }[] } }[];
+  notes: CompiledNotes;
+}
+
+export interface ReleaseCandidate {
+  id: number;
+  subject: string;
+  type: string;
+  status: string;
+  matchesVersion: boolean;
+}
+
+export interface PublicRelease {
+  id: string;
+  version: string;
+  title: string | null;
+  publishedAt: string;
+  sections: CompiledNotes['customer'];
+}
+
+export interface PurgeResult {
+  dryRun: boolean;
+  cutoff: string;
+  users: number;
+  emailLogs: number;
 }

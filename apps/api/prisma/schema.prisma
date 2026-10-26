@@ -187,6 +187,7 @@ model Ticket {
   attachments    Attachment[]
   devLinks       DevLink[]
   incidents      Incident[]
+  releaseItems   ReleaseItem[]
   /// Version de correction (« Fixed in v2.4.1 »), reprise de l'outil de développement.
   fixedInVersion String?
   outboundEmails OutboundEmail[]
@@ -681,4 +682,41 @@ model IncidentBroadcast {
   createdAt  DateTime @default(now())
 
   @@index([incidentId])
+}
+
+enum ReleaseStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ReleaseCategory {
+  NEW
+  FIX
+  ARCHITECTURE
+}
+
+/// Version de livraison : regroupe les tickets livrés et compile les notes.
+model Release {
+  id            String        @id @default(uuid()) @db.Uuid
+  version       String        @unique
+  title         String?
+  status        ReleaseStatus @default(DRAFT)
+  createdAt     DateTime      @default(now())
+  publishedAt   DateTime?
+  /// Nombre de demandeurs prévenus par e-mail à la publication (null : pas encore notifié).
+  notifiedCount Int?
+  items         ReleaseItem[]
+}
+
+model ReleaseItem {
+  releaseId String          @db.Uuid
+  release   Release         @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  ticketId  Int
+  ticket    Ticket          @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  category  ReleaseCategory
+  /// Résumé vulgarisé pour les clients ; sans résumé, le ticket reste dans les notes techniques seulement.
+  summary   String?
+
+  @@id([releaseId, ticketId])
+  @@index([ticketId])
 }

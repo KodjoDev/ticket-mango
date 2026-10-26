@@ -1971,3 +1971,55 @@ h3.subhead {
   background: #e6f4ea;
   color: #1e6b35;
 }
+
+.release-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.release-item .inline-form input {
+  flex: 1;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.kpis .card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpis strong {
+  font-size: 24px;
+}
+
+.bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bars li {
+  display: grid;
+  grid-template-columns: 160px 1fr 40px;
+  gap: 8px;
+  align-items: center;
+}
+
+.bars .bar {
+  height: 10px;
+  min-width: 2px;
+  border-radius: 5px;
+  background: #1f73b7;
+}

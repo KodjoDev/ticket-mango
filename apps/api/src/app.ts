@@ -15,6 +15,10 @@ import { DevService } from './services/dev/service';
 import type { HttpFetch } from './services/dev/providers';
 import { alertAdminRoutes, incidentRoutes, publicStatusRoutes } from './routes/incidents';
 import { IncidentService } from './services/incidents/service';
+import { publicReleaseRoutes, releaseRoutes } from './routes/releases';
+import { ReleaseService } from './services/releases';
+import { privacyRoutes, reportRoutes } from './routes/privacy-reports';
+import { PrivacyService } from './services/privacy';
 import { attachmentRoutes } from './routes/attachments';
 import { authRoutes } from './routes/auth';
 import { configRoutes } from './routes/config';
@@ -170,6 +174,7 @@ export async function buildApp({
   const imapPoller = new ImapPoller(prisma, inbound, secrets, imapConnector);
   const dev = new DevService({ prisma, tickets, secrets, publicAppUrl, fetcher: devFetch });
   const incidents = new IncidentService({ prisma, notifications, mailer, secrets, fetcher: devFetch, publicAppUrl });
+  const releases = new ReleaseService({ prisma, mailer, publicAppUrl });
   const macros = new MacroService(prisma, configService, tickets);
   const meetings = new MeetingService({
     prisma,
@@ -193,11 +198,14 @@ export async function buildApp({
   await app.register(developerRoutes, { prefix: '/developers', prisma });
   await app.register(macroRoutes, { prefix: '/macros', macros });
   await app.register(devRoutes, { prefix: '/dev', dev });
+  await app.register(reportRoutes, { prefix: '/reports', prisma });
+  await app.register(releaseRoutes, { prefix: '/releases', releases });
   await app.register(incidentRoutes, { prefix: '/incidents', incidents });
   await app.register(spellcheckRoutes, { prefix: '/spellcheck', client: spellchecker });
 
   // Accès publics (jeton secret dans l'URL)
   await app.register(bookingRoutes, { prefix: '/public/bookings', meetings });
+  await app.register(publicReleaseRoutes, { prefix: '/public/releases', releases });
   await app.register(publicStatusRoutes, { prefix: '/public/status', incidents });
   await app.register(inboundRoutes, { prefix: '/inbound', prisma, inbound });
   await app.register(devWebhookRoutes, { prefix: '/inbound', prisma, dev });
@@ -207,6 +215,7 @@ export async function buildApp({
   await app.register(macroAdminRoutes, { prefix: '/admin/macros', prisma, macros });
   const publicApiUrl = config.PUBLIC_API_URL ?? `${publicAppUrl.replace(/\/$/, '')}/api`;
   await app.register(devAdminRoutes, { prefix: '/admin', prisma, secrets, publicApiUrl });
+  await app.register(privacyRoutes, { prefix: '/admin/privacy', privacy: new PrivacyService(prisma, storage) });
   await app.register(alertAdminRoutes, { prefix: '/admin', prisma, secrets });
   await app.register(emailAdminRoutes, {
     prefix: '/admin',
