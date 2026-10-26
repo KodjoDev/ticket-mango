@@ -477,3 +477,10 @@ export interface PublicRelease {
   publishedAt: string;
   sections: CompiledNotes['customer'];
 }
+
+export interface PurgeResult {
+  dryRun: boolean;
+  cutoff: string;
+  users: number;
+  emailLogs: number;
+}

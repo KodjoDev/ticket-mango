@@ -1,5 +1,6 @@
 import type {
   AlertKindName,
+  Report,
   ReleaseCategory,
   DevProviderName,
   IncidentSeverity,
@@ -19,6 +20,7 @@ import type {
   Agent,
   AlertChannel,
   AppConfig,
+  PurgeResult,
   PublicRelease,
   ReleaseCandidate,
   ReleaseDetail,
@@ -221,6 +223,8 @@ export const api = {
   notifyRelease: (id: string) =>
     request<{ requesters: number; sent: number; failed: number; delivered: boolean }>('POST', `/releases/${id}/notify`),
 
+  report: (from: string, to: string) => request<Report>('GET', `/reports?from=${from}&to=${to}`),
+
   spellcheck: (text: string) => request<{ issues: SpellcheckIssue[] }>('POST', '/spellcheck', { text }),
 };
 
@@ -292,6 +296,9 @@ export const adminApi = {
   updateDevIntegration: (id: string, input: Partial<DevIntegrationInput>) =>
     request<DevIntegration>('PATCH', `/admin/dev-integrations/${id}`, input),
   deleteDevIntegration: (id: string) => request<void>('DELETE', `/admin/dev-integrations/${id}`),
+  exportUser: (id: string) => request<unknown>('GET', `/admin/privacy/users/${id}/export`),
+  anonymizeUser: (id: string, eraseContent: boolean) => request<void>('POST', `/admin/privacy/users/${id}/anonymize`, { eraseContent }),
+  purge: (months: number, dryRun: boolean) => request<PurgeResult>('POST', '/admin/privacy/purge', { months, dryRun }),
   alertChannels: () => request<AlertChannel[]>('GET', '/admin/alert-channels'),
   createAlertChannel: (input: { kind: AlertKindName; name: string; target: string; isActive: boolean }) =>
     request<AlertChannel>('POST', '/admin/alert-channels', input),

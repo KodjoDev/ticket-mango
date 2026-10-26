@@ -64,6 +64,7 @@ export function Layout() {
           {can('ticket:read:all') ? <ViewsNav /> : <NavLink to="/tickets">Mes demandes</NavLink>}
           <div className="nav-group">
             {can('ticket:read:all') && <AllTicketsLink />}
+            {can('report:read') && <NavLink to="/reports">Statistiques</NavLink>}
             {can('ticket:read:all') && <NavLink to="/releases/manage">Versions</NavLink>}
             {can('ticket:read:all') && <NavLink to="/incidents">Incidents majeurs</NavLink>}
             {can('ticket:create') && <NavLink to="/tickets/new">Nouveau ticket</NavLink>}
