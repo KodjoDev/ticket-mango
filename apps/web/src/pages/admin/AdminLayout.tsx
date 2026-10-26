@@ -3,12 +3,11 @@ import { Navigate, NavLink, Outlet } from 'react-router';
 import { useAuth } from '../../auth/AuthContext';
 
 export const ADMIN_SECTIONS: { path: string; label: string; permission: Permission }[] = [
-  { path: 'users', label: 'Utilisateurs', permission: 'user:manage' },
+  { path: 'users', label: 'Utilisateurs et groupes', permission: 'user:manage' },
   { path: 'privacy', label: 'RGPD', permission: 'user:manage' },
   { path: 'mail', label: 'Messagerie', permission: 'settings:manage' },
   { path: 'alerts', label: 'Alertes', permission: 'settings:manage' },
   { path: 'dev', label: 'Développement', permission: 'settings:manage' },
-  { path: 'groups', label: 'Groupes', permission: 'settings:manage' },
   { path: 'routing', label: 'Routage', permission: 'settings:manage' },
   { path: 'sla', label: 'SLA', permission: 'settings:manage' },
   { path: 'qualification', label: 'Qualification', permission: 'settings:manage' },
