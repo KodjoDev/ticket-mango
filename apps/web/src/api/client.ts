@@ -1,5 +1,8 @@
 import type {
+  AlertKindName,
   DevProviderName,
+  IncidentSeverity,
+  IncidentStatus,
   LayoutItem,
   ListColumn,
   MacroActions,
@@ -13,7 +16,11 @@ import type {
 } from '@ticketing/shared';
 import type {
   Agent,
+  AlertChannel,
   AppConfig,
+  IncidentDetail,
+  IncidentSummary,
+  PublicStatus,
   AuditEntry,
   Booking,
   Comment,
@@ -184,12 +191,24 @@ export const api = {
   markNotificationRead: (id: string) => request<void>('POST', `/notifications/${id}/read`),
   markAllNotificationsRead: () => request<void>('POST', '/notifications/read-all'),
 
+  incidents: (active = false) => request<IncidentSummary[]>('GET', `/incidents${active ? '?active=true' : ''}`),
+  incident: (id: string) => request<IncidentDetail>('GET', `/incidents/${id}`),
+  openIncident: (input: { title: string; severity: IncidentSeverity; message: string; ticketId?: number | null }) =>
+    request<IncidentDetail>('POST', '/incidents', input),
+  updateIncident: (id: string, input: { status: IncidentStatus; message: string }) =>
+    request<IncidentDetail>('POST', `/incidents/${id}/updates`, input),
+  savePostMortem: (id: string, input: { impact: string | null; rootCause: string | null; actions: string | null }) =>
+    request<IncidentDetail>('PUT', `/incidents/${id}/postmortem`, input),
+  broadcastIncident: (id: string, input: { recipients: string[]; subject: string; message: string }) =>
+    request<{ recipients: number; sent: number; failed: number; delivered: boolean }>('POST', `/incidents/${id}/broadcast`, input),
+
   spellcheck: (text: string) => request<{ issues: SpellcheckIssue[] }>('POST', '/spellcheck', { text }),
 };
 
 /** Page publique de réservation : aucune session requise. */
 export const publicApi = {
   booking: (token: string) => request<Booking>('GET', `/public/bookings/${token}`),
+  status: () => request<PublicStatus>('GET', '/public/status'),
   book: (token: string, slotId: string) => request<Booking>('POST', `/public/bookings/${token}`, { slotId }),
 };
 
@@ -253,6 +272,12 @@ export const adminApi = {
   updateDevIntegration: (id: string, input: Partial<DevIntegrationInput>) =>
     request<DevIntegration>('PATCH', `/admin/dev-integrations/${id}`, input),
   deleteDevIntegration: (id: string) => request<void>('DELETE', `/admin/dev-integrations/${id}`),
+  alertChannels: () => request<AlertChannel[]>('GET', '/admin/alert-channels'),
+  createAlertChannel: (input: { kind: AlertKindName; name: string; target: string; isActive: boolean }) =>
+    request<AlertChannel>('POST', '/admin/alert-channels', input),
+  updateAlertChannel: (id: string, input: Partial<{ name: string; target: string; isActive: boolean }>) =>
+    request<AlertChannel>('PATCH', `/admin/alert-channels/${id}`, input),
+  deleteAlertChannel: (id: string) => request<void>('DELETE', `/admin/alert-channels/${id}`),
   mailboxes: () => request<Mailbox[]>('GET', '/admin/mailboxes'),
   createMailbox: (input: MailboxInput) => request<Mailbox>('POST', '/admin/mailboxes', input),
   updateMailbox: (id: string, input: Partial<MailboxInput>) => request<Mailbox>('PATCH', `/admin/mailboxes/${id}`, input),

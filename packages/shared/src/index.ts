@@ -7,3 +7,4 @@ export * from './macros';
 export * from './business-time';
 export * from './sla';
 export * from './dev-integrations';
+export * from './incidents';

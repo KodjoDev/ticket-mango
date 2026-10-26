@@ -208,6 +208,34 @@ export class OutboundMailer {
     return { sent, failed };
   }
 
+  /**
+   * Diffusion groupée sans ticket : un message par destinataire, envoyé tout de suite (pas de file).
+   * `delivered` est faux quand aucun SMTP n'est configuré : rien n'a quitté l'application.
+   */
+  async broadcast(to: string[], subject: string, text: string) {
+    const from = await this.fromAddress(this.d.prisma, null);
+    if (!from) throw new Error("Aucune adresse d'expédition : créez une boîte de réception ou renseignez EMAIL_FROM");
+    let sent = 0;
+    let failed = 0;
+    for (const address of to) {
+      try {
+        await this.d.transport.send({
+          from,
+          to: address,
+          subject,
+          text,
+          messageId: this.newMessageId(),
+          headers: { 'Auto-Submitted': 'auto-generated', 'X-Auto-Response-Suppress': 'All', Precedence: 'bulk' },
+          attachments: [],
+        });
+        sent++;
+      } catch {
+        failed++;
+      }
+    }
+    return { sent, failed, delivered: this.d.transport.delivers };
+  }
+
   start(intervalMs: number, onError: (err: unknown) => void) {
     const tick = () => void this.processPending().catch(onError);
     this.timer = setInterval(tick, intervalMs);

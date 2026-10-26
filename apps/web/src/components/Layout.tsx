@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { ConfigProvider } from '../config/ConfigContext';
 import { isViewActive, viewToParams } from '../filters';
+import { IncidentBanner } from './IncidentBanner';
 import { NotificationBell } from './Notifications';
 import { Avatar, Spinner } from './ui';
 
@@ -63,6 +64,7 @@ export function Layout() {
           {can('ticket:read:all') ? <ViewsNav /> : <NavLink to="/tickets">Mes demandes</NavLink>}
           <div className="nav-group">
             {can('ticket:read:all') && <AllTicketsLink />}
+            {can('ticket:read:all') && <NavLink to="/incidents">Incidents majeurs</NavLink>}
             {can('ticket:create') && <NavLink to="/tickets/new">Nouveau ticket</NavLink>}
             {(can('settings:manage') || can('user:manage')) && <NavLink to="/admin">Administration</NavLink>}
           </div>
@@ -79,6 +81,7 @@ export function Layout() {
         </div>
       </aside>
       <main className="content">
+        <IncidentBanner />
         <ConfigProvider>
           <Outlet />
         </ConfigProvider>
