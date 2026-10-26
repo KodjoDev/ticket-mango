@@ -5,7 +5,6 @@ import { AuthProvider } from './auth/AuthContext';
 import { Layout } from './components/Layout';
 import { AdminIndex, AdminLayout, RequirePermission } from './pages/admin/AdminLayout';
 import { CustomFieldsAdmin } from './pages/admin/CustomFieldsAdmin';
-import { GroupsAdmin } from './pages/admin/GroupsAdmin';
 import { LayoutAdmin } from './pages/admin/LayoutAdmin';
 import { DevAdmin } from './pages/admin/DevAdmin';
 import { MailAdmin } from './pages/admin/MailAdmin';
@@ -15,7 +14,7 @@ import { MacrosAdmin } from './pages/admin/MacrosAdmin';
 import { PriorityAdmin } from './pages/admin/PriorityAdmin';
 import { QualificationAdmin } from './pages/admin/QualificationAdmin';
 import { TagsAdmin } from './pages/admin/TagsAdmin';
-import { UsersAdmin } from './pages/admin/UsersAdmin';
+import { UsersGroupsAdmin } from './pages/admin/UsersGroupsAdmin';
 import { ViewsAdmin } from './pages/admin/ViewsAdmin';
 import { AlertsAdmin } from './pages/admin/AlertsAdmin';
 import { IncidentDetailPage, IncidentListPage } from './pages/IncidentsPage';
@@ -60,12 +59,12 @@ export function AppRoutes() {
         <Route path="/incidents/:id" element={<IncidentDetailPage />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminIndex />} />
-          <Route path="users" element={<RequirePermission permission="user:manage"><UsersAdmin /></RequirePermission>} />
+          <Route path="users" element={<RequirePermission permission="user:manage"><UsersGroupsAdmin /></RequirePermission>} />
           <Route path="dev" element={<RequirePermission permission="settings:manage"><DevAdmin /></RequirePermission>} />
           <Route path="alerts" element={<RequirePermission permission="settings:manage"><AlertsAdmin /></RequirePermission>} />
           <Route path="privacy" element={<RequirePermission permission="user:manage"><PrivacyAdmin /></RequirePermission>} />
           <Route path="mail" element={<RequirePermission permission="settings:manage"><MailAdmin /></RequirePermission>} />
-          <Route path="groups" element={<RequirePermission permission="settings:manage"><GroupsAdmin /></RequirePermission>} />
+          <Route path="groups" element={<Navigate to="/admin/users" replace />} />
           <Route path="routing" element={<RequirePermission permission="settings:manage"><RoutingAdmin /></RequirePermission>} />
           <Route path="sla" element={<RequirePermission permission="settings:manage"><SlaAdmin /></RequirePermission>} />
           <Route path="qualification" element={<RequirePermission permission="settings:manage"><QualificationAdmin /></RequirePermission>} />
