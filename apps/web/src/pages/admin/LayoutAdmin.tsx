@@ -14,6 +14,7 @@ import {
   type LayoutItem,
 } from "@ticketing/shared";
 import { useState } from "react";
+import { CustomFieldsAdmin } from "./CustomFieldsAdmin";
 import { adminApi } from "../../api/client";
 import { ErrorMessage } from "../../components/ui";
 import { useConfig } from "../../config/ConfigContext";
@@ -183,25 +184,30 @@ function TicketPageEditor() {
 export function LayoutAdmin() {
   const config = useConfig();
   return (
-    <div className="admin-section two-columns">
-      <TicketPageEditor />
-      <LayoutEditor
-        title="Champs du ticket"
-        help="Ordre et visibilité des champs de qualification, dans le panneau du ticket et le formulaire de création."
-        saved={config.ticketForm}
-        defaults={DEFAULT_TICKET_FORM}
-        labels={TICKET_FORM_FIELD_LABELS}
-        onSave={adminApi.saveTicketForm}
-      />
-      <LayoutEditor
-        title="Colonnes de la liste"
-        help="Ordre et visibilité des colonnes de la liste des tickets."
-        saved={config.listColumns}
-        defaults={DEFAULT_LIST_COLUMNS}
-        labels={LIST_COLUMN_LABELS}
-        locked={["subject"]}
-        onSave={adminApi.saveListColumns}
-      />
-    </div>
+    <>
+      <div className="admin-section two-columns">
+        <TicketPageEditor />
+        <LayoutEditor
+          title="Champs du ticket"
+          help="Ordre et visibilité des champs de qualification, dans le panneau du ticket et le formulaire de création."
+          saved={config.ticketForm}
+          defaults={DEFAULT_TICKET_FORM}
+          labels={TICKET_FORM_FIELD_LABELS}
+          onSave={adminApi.saveTicketForm}
+        />
+        <LayoutEditor
+          title="Colonnes de la liste"
+          help="Ordre et visibilité des colonnes de la liste des tickets."
+          saved={config.listColumns}
+          defaults={DEFAULT_LIST_COLUMNS}
+          labels={LIST_COLUMN_LABELS}
+          locked={["subject"]}
+          onSave={adminApi.saveListColumns}
+        />
+      </div>
+      <div className="admin-section">
+        <CustomFieldsAdmin />
+      </div>
+    </>
   );
 }

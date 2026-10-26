@@ -4,7 +4,6 @@ import { ApiError } from './api/client';
 import { AuthProvider } from './auth/AuthContext';
 import { Layout } from './components/Layout';
 import { AdminIndex, AdminLayout, RequirePermission } from './pages/admin/AdminLayout';
-import { CustomFieldsAdmin } from './pages/admin/CustomFieldsAdmin';
 import { GroupsAdmin } from './pages/admin/GroupsAdmin';
 import { LayoutAdmin } from './pages/admin/LayoutAdmin';
 import { DevAdmin } from './pages/admin/DevAdmin';
@@ -71,7 +70,6 @@ export function AppRoutes() {
           <Route path="qualification" element={<RequirePermission permission="settings:manage"><QualificationAdmin /></RequirePermission>} />
           <Route path="priority" element={<RequirePermission permission="settings:manage"><PriorityAdmin /></RequirePermission>} />
           <Route path="tags" element={<RequirePermission permission="settings:manage"><TagsAdmin /></RequirePermission>} />
-          <Route path="fields" element={<RequirePermission permission="settings:manage"><CustomFieldsAdmin /></RequirePermission>} />
           <Route path="layout" element={<RequirePermission permission="settings:manage"><LayoutAdmin /></RequirePermission>} />
           <Route path="views" element={<RequirePermission permission="settings:manage"><ViewsAdmin /></RequirePermission>} />
           <Route path="macros" element={<RequirePermission permission="settings:manage"><MacrosAdmin /></RequirePermission>} />
