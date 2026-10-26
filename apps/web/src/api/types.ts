@@ -1,4 +1,7 @@
 import type {
+  AlertKindName,
+  IncidentSeverity,
+  IncidentStatus,
   DevProviderName,
   Impact,
   LayoutItem,
@@ -396,3 +399,48 @@ export type TicketInput = Partial<{
   groupId: string | null;
   tagIds: string[];
 }>;
+
+export interface PublicIncident {
+  id: string;
+  title: string;
+  severity: IncidentSeverity;
+  status: IncidentStatus;
+  startedAt: string;
+  resolvedAt: string | null;
+  /** Du plus récent au plus ancien. */
+  updates: { status: IncidentStatus; message: string; createdAt: string }[];
+}
+
+export interface PublicStatus {
+  operational: boolean;
+  active: PublicIncident[];
+  recent: PublicIncident[];
+}
+
+export interface IncidentSummary {
+  id: string;
+  title: string;
+  severity: IncidentSeverity;
+  status: IncidentStatus;
+  startedAt: string;
+  resolvedAt: string | null;
+  ticket: { id: number; subject: string } | null;
+}
+
+export interface IncidentDetail extends IncidentSummary {
+  pmImpact: string | null;
+  pmRootCause: string | null;
+  pmActions: string | null;
+  createdBy: { id: string; name: string };
+  updates: { id: string; status: IncidentStatus; message: string; createdAt: string; author: { id: string; name: string } }[];
+  deliveries: { id: string; event: string; ok: boolean; error: string | null; createdAt: string; channel: { name: string; kind: AlertKindName } }[];
+  broadcasts: { id: string; subject: string; recipients: number; sent: number; failed: number; delivered: boolean; createdAt: string }[];
+}
+
+export interface AlertChannel {
+  id: string;
+  kind: AlertKindName;
+  name: string;
+  isActive: boolean;
+  hasTarget: boolean;
+}

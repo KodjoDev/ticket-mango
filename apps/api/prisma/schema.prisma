@@ -125,6 +125,8 @@ model User {
   groupMemberships  GroupMember[]
   managedGroups     Group[]           @relation("manager")
   notifications     Notification[]
+  incidentsOpened   Incident[]
+  incidentUpdates   IncidentUpdate[]
 }
 
 model Ticket {
@@ -184,6 +186,7 @@ model Ticket {
   notifications  Notification[]
   attachments    Attachment[]
   devLinks       DevLink[]
+  incidents      Incident[]
   /// Version de correction (« Fixed in v2.4.1 »), reprise de l'outil de développement.
   fixedInVersion String?
   outboundEmails OutboundEmail[]
@@ -579,4 +582,103 @@ model Attachment {
 
   @@index([ticketId])
   @@index([commentId])
+}
+
+enum IncidentStatus {
+  INVESTIGATING
+  IDENTIFIED
+  FIXING
+  RESOLVED
+}
+
+enum AlertKind {
+  SLACK
+  TEAMS
+  PAGERDUTY
+  WEBHOOK
+}
+
+/// Incident majeur (P0/P1) : visible sur la status page publique et diffusé aux équipes d'astreinte.
+model Incident {
+  id          String              @id @default(uuid()) @db.Uuid
+  title       String
+  /// P0 ou P1.
+  severity    Priority
+  status      IncidentStatus      @default(INVESTIGATING)
+  /// Ticket référent éventuel : l'incident ne crée aucun ticket par client.
+  ticketId    Int?
+  ticket      Ticket?             @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  createdById String              @db.Uuid
+  createdBy   User                @relation(fields: [createdById], references: [id])
+  startedAt   DateTime            @default(now())
+  resolvedAt  DateTime?
+  /// Post-mortem (PIR) : la chronologie se déduit des mises à jour.
+  pmImpact    String?
+  pmRootCause String?
+  pmActions   String?
+  updates     IncidentUpdate[]
+  deliveries  AlertDelivery[]
+  broadcasts  IncidentBroadcast[]
+
+  @@index([status, startedAt])
+  @@index([ticketId])
+}
+
+/// Message publié sur la status page à chaque changement de statut.
+model IncidentUpdate {
+  id         String         @id @default(uuid()) @db.Uuid
+  incidentId String         @db.Uuid
+  incident   Incident       @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  status     IncidentStatus
+  message    String
+  authorId   String         @db.Uuid
+  author     User           @relation(fields: [authorId], references: [id])
+  createdAt  DateTime       @default(now())
+
+  @@index([incidentId, createdAt])
+}
+
+/// Destination d'alerte (Slack, Teams, PagerDuty, webhook générique).
+model AlertChannel {
+  id         String          @id @default(uuid()) @db.Uuid
+  kind       AlertKind
+  name       String
+  isActive   Boolean         @default(true)
+  /// URL du webhook, ou clé d'intégration PagerDuty ; chiffrée, jamais renvoyée par l'API.
+  targetEnc  String
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  deliveries AlertDelivery[]
+}
+
+/// Journal des alertes envoyées : l'interface n'affiche « envoyée » que si elle l'a été.
+model AlertDelivery {
+  id         String       @id @default(uuid()) @db.Uuid
+  incidentId String       @db.Uuid
+  incident   Incident     @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  channelId  String       @db.Uuid
+  channel    AlertChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  /// opened, updated ou resolved.
+  event      String
+  ok         Boolean
+  error      String?
+  createdAt  DateTime     @default(now())
+
+  @@index([incidentId, createdAt])
+}
+
+/// Diffusion groupée par e-mail aux clients impactés (aucun ticket individuel).
+model IncidentBroadcast {
+  id         String   @id @default(uuid()) @db.Uuid
+  incidentId String   @db.Uuid
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  subject    String
+  recipients Int
+  sent       Int
+  failed     Int
+  /// Faux si aucun SMTP n'est configuré : les messages ont été journalisés, non envoyés.
+  delivered  Boolean
+  createdAt  DateTime @default(now())
+
+  @@index([incidentId])
 }

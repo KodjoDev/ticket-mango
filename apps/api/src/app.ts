@@ -13,6 +13,8 @@ import { agentRoutes, requesterRoutes } from './routes/agents';
 import { devAdminRoutes, devRoutes, devWebhookRoutes } from './routes/dev';
 import { DevService } from './services/dev/service';
 import type { HttpFetch } from './services/dev/providers';
+import { alertAdminRoutes, incidentRoutes, publicStatusRoutes } from './routes/incidents';
+import { IncidentService } from './services/incidents/service';
 import { attachmentRoutes } from './routes/attachments';
 import { authRoutes } from './routes/auth';
 import { configRoutes } from './routes/config';
@@ -80,7 +82,7 @@ export interface AppDeps {
   /** Transport d'envoi des e-mails ; journalisation seule si aucun n'est fourni. */
   mailTransport?: MailTransport;
   imapConnector?: ImapConnector;
-  /** Client HTTP des appels sortants vers Jira / GitHub ; fetch par défaut. */
+  /** Client HTTP des appels sortants (Jira, GitHub, alertes d'incident) ; fetch par défaut. */
   devFetch?: HttpFetch;
 }
 
@@ -167,6 +169,7 @@ export async function buildApp({
   const inbound = new InboundService({ prisma, tickets, mailer, config: configService, storage });
   const imapPoller = new ImapPoller(prisma, inbound, secrets, imapConnector);
   const dev = new DevService({ prisma, tickets, secrets, publicAppUrl, fetcher: devFetch });
+  const incidents = new IncidentService({ prisma, notifications, mailer, secrets, fetcher: devFetch, publicAppUrl });
   const macros = new MacroService(prisma, configService, tickets);
   const meetings = new MeetingService({
     prisma,
@@ -190,10 +193,12 @@ export async function buildApp({
   await app.register(developerRoutes, { prefix: '/developers', prisma });
   await app.register(macroRoutes, { prefix: '/macros', macros });
   await app.register(devRoutes, { prefix: '/dev', dev });
+  await app.register(incidentRoutes, { prefix: '/incidents', incidents });
   await app.register(spellcheckRoutes, { prefix: '/spellcheck', client: spellchecker });
 
   // Accès publics (jeton secret dans l'URL)
   await app.register(bookingRoutes, { prefix: '/public/bookings', meetings });
+  await app.register(publicStatusRoutes, { prefix: '/public/status', incidents });
   await app.register(inboundRoutes, { prefix: '/inbound', prisma, inbound });
   await app.register(devWebhookRoutes, { prefix: '/inbound', prisma, dev });
 
@@ -202,6 +207,7 @@ export async function buildApp({
   await app.register(macroAdminRoutes, { prefix: '/admin/macros', prisma, macros });
   const publicApiUrl = config.PUBLIC_API_URL ?? `${publicAppUrl.replace(/\/$/, '')}/api`;
   await app.register(devAdminRoutes, { prefix: '/admin', prisma, secrets, publicApiUrl });
+  await app.register(alertAdminRoutes, { prefix: '/admin', prisma, secrets });
   await app.register(emailAdminRoutes, {
     prefix: '/admin',
     prisma,

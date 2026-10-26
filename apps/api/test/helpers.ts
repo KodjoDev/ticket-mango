@@ -88,7 +88,7 @@ const SEEDED_MACROS = [
 
 export async function resetDb(prisma: PrismaClient) {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE "DevLink", "DevIntegration", "Attachment", "OutboundEmail", "InboundEmail", "Mailbox", "AuditLog", "Comment", "TicketTag", "Tag", "MeetingAttendee", "MeetingSlot", "Meeting", "Notification", "SlaAlert", "SlaPause", "GroupMember", "RoutingRule", "Group", "Ticket", "User", "Setting", "View" RESTART IDENTITY CASCADE',
+    'TRUNCATE "IncidentBroadcast", "AlertDelivery", "AlertChannel", "IncidentUpdate", "Incident", "DevLink", "DevIntegration", "Attachment", "OutboundEmail", "InboundEmail", "Mailbox", "AuditLog", "Comment", "TicketTag", "Tag", "MeetingAttendee", "MeetingSlot", "Meeting", "Notification", "SlaAlert", "SlaPause", "GroupMember", "RoutingRule", "Group", "Ticket", "User", "Setting", "View" RESTART IDENTITY CASCADE',
   );
   // Groupes et règles de routage tels que créés par la migration.
   await prisma.group.createMany({ data: DEFAULT_GROUPS.map((g, position) => ({ ...g, position })) });

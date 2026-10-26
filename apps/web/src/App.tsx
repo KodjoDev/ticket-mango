@@ -16,6 +16,9 @@ import { QualificationAdmin } from './pages/admin/QualificationAdmin';
 import { TagsAdmin } from './pages/admin/TagsAdmin';
 import { UsersAdmin } from './pages/admin/UsersAdmin';
 import { ViewsAdmin } from './pages/admin/ViewsAdmin';
+import { AlertsAdmin } from './pages/admin/AlertsAdmin';
+import { IncidentDetailPage, IncidentListPage } from './pages/IncidentsPage';
+import { StatusPage } from './pages/StatusPage';
 import { BookingPage } from './pages/BookingPage';
 import { LoginPage } from './pages/LoginPage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
@@ -39,14 +42,18 @@ export function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/book/:token" element={<BookingPage />} />
+      <Route path="/status" element={<StatusPage />} />
       <Route element={<Layout />}>
         <Route path="/tickets" element={<TicketListPage />} />
         <Route path="/tickets/new" element={<TicketNewPage />} />
         <Route path="/tickets/:id" element={<TicketDetailPage />} />
+        <Route path="/incidents" element={<IncidentListPage />} />
+        <Route path="/incidents/:id" element={<IncidentDetailPage />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminIndex />} />
           <Route path="users" element={<RequirePermission permission="user:manage"><UsersAdmin /></RequirePermission>} />
           <Route path="dev" element={<RequirePermission permission="settings:manage"><DevAdmin /></RequirePermission>} />
+          <Route path="alerts" element={<RequirePermission permission="settings:manage"><AlertsAdmin /></RequirePermission>} />
           <Route path="mail" element={<RequirePermission permission="settings:manage"><MailAdmin /></RequirePermission>} />
           <Route path="groups" element={<RequirePermission permission="settings:manage"><GroupsAdmin /></RequirePermission>} />
           <Route path="routing" element={<RequirePermission permission="settings:manage"><RoutingAdmin /></RequirePermission>} />

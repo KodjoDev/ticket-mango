@@ -25,6 +25,8 @@ export const PERMISSIONS = [
   'meeting:create',
   /** Administrer la qualification, la matrice de priorité, les tags, la mise en page et les vues. */
   'settings:manage',
+  /** Ouvrir, mettre à jour et clore un incident majeur, diffuser aux clients, rédiger le post-mortem. */
+  'incident:manage',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -44,7 +46,7 @@ const AGENT_PERMISSIONS: Permission[] = [
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   READER: ['ticket:read:all', 'audit:read'],
   AGENT_N1: AGENT_PERMISSIONS,
-  AGENT_N2: [...AGENT_PERMISSIONS, 'ticket:priority:override'],
+  AGENT_N2: [...AGENT_PERMISSIONS, 'ticket:priority:override', 'incident:manage'],
   ADMIN: PERMISSIONS,
   // Le développeur suit les tickets et échange avec le support en notes internes, sans qualifier.
   DEVELOPER: ['ticket:read:all', 'comment:create', 'comment:internal', 'audit:read'],
