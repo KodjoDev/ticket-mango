@@ -1,4 +1,5 @@
 import type {
+  DevProviderName,
   LayoutItem,
   ListColumn,
   MacroActions,
@@ -16,6 +17,8 @@ import type {
   AuditEntry,
   Booking,
   Comment,
+  DevIntegration,
+  DevIntegrationChoice,
   FieldOption,
   AdminGroup,
   AttachmentRef,
@@ -45,6 +48,19 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
 
 /** Lien de téléchargement d'une pièce jointe (même origine : le cookie de session suit). */
 export const attachmentUrl = (id: string) => `${BASE_URL}/attachments/${id}`;
+
+export interface DevIntegrationInput {
+  provider: DevProviderName;
+  name: string;
+  isActive: boolean;
+  baseUrl: string | null;
+  account: string | null;
+  /** Écriture seule ; vide = inchangé. */
+  token: string;
+  project: string;
+  issueType: string;
+  statusMap: Record<string, TicketStatus>;
+}
 
 export interface MailboxInput {
   name: string;
@@ -114,6 +130,10 @@ export const api = {
   me: () => request<User>('GET', '/auth/me'),
 
   agents: () => request<Agent[]>('GET', '/agents'),
+  devIntegrations: () => request<DevIntegrationChoice[]>('GET', '/dev/integrations'),
+  linkIssue: (ticketId: number, integrationId: string, reference?: string) =>
+    request<{ externalKey: string; url: string }>('POST', `/dev/tickets/${ticketId}/links`, { integrationId, ...(reference && { reference }) }),
+  unlinkIssue: (ticketId: number, linkId: string) => request<void>('DELETE', `/dev/tickets/${ticketId}/links/${linkId}`),
   requesters: (q: string) => request<User[]>('GET', `/requesters?${new URLSearchParams({ q })}`),
   createRequester: (input: { email: string; name: string }) => request<User>('POST', '/requesters', input),
 
@@ -228,6 +248,11 @@ export const adminApi = {
   reorderRules: (ids: string[]) => request<RoutingRule[]>('PUT', '/admin/routing-rules/order', { ids }),
   deleteRule: (id: string) => request<void>('DELETE', `/admin/routing-rules/${id}`),
 
+  devIntegrations: () => request<DevIntegration[]>('GET', '/admin/dev-integrations'),
+  createDevIntegration: (input: Partial<DevIntegrationInput>) => request<DevIntegration>('POST', '/admin/dev-integrations', input),
+  updateDevIntegration: (id: string, input: Partial<DevIntegrationInput>) =>
+    request<DevIntegration>('PATCH', `/admin/dev-integrations/${id}`, input),
+  deleteDevIntegration: (id: string) => request<void>('DELETE', `/admin/dev-integrations/${id}`),
   mailboxes: () => request<Mailbox[]>('GET', '/admin/mailboxes'),
   createMailbox: (input: MailboxInput) => request<Mailbox>('POST', '/admin/mailboxes', input),
   updateMailbox: (id: string, input: Partial<MailboxInput>) => request<Mailbox>('PATCH', `/admin/mailboxes/${id}`, input),

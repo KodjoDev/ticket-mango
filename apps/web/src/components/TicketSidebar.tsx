@@ -6,6 +6,7 @@ import type { Agent, Ticket, TicketDetail, TicketInput } from '../api/types';
 import { useAuth, useCurrentUser } from '../auth/AuthContext';
 import { useConfig } from '../config/ConfigContext';
 import { QualificationFields } from './QualificationFields';
+import { DevLinksCard } from './DevLinks';
 import { MergeCard } from './Merge';
 import { ReferentCard } from './Referent';
 import { RequesterPicker } from './Requester';
@@ -95,6 +96,7 @@ export function TicketSidebar({ ticket, agents }: { ticket: TicketDetail; agents
       <section className="card">
         <h2>Statut</h2>
         <StatusBadge status={ticket.status} />
+        {ticket.fixedInVersion && <p className="small">Corrigé dans la version <strong>{ticket.fixedInVersion}</strong></p>}
         <ErrorMessage error={transition.error} />
         {nextStatuses.length > 0 && (
           <div className="transitions">
@@ -194,6 +196,7 @@ export function TicketSidebar({ ticket, agents }: { ticket: TicketDetail; agents
         )}
       </section>
 
+      <DevLinksCard ticket={ticket} />
       <ReferentCard ticket={ticket} />
       <MergeCard ticket={ticket} />
 

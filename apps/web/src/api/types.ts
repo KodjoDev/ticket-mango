@@ -1,4 +1,5 @@
 import type {
+  DevProviderName,
   Impact,
   LayoutItem,
   ListColumn,
@@ -72,6 +73,8 @@ export interface Ticket {
   firstResponseAt: string | null;
   resolvedAt: string | null;
   closedAt: string | null;
+  /** Version de correction reprise de l'outil de développement. */
+  fixedInVersion: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -93,7 +96,36 @@ export interface SlaStatusDto {
 }
 
 /** Détail d'un ticket : avec les tickets rattachés s'il est référent. */
+export interface DevLink {
+  id: string;
+  externalKey: string;
+  url: string;
+  title: string;
+  externalStatus: string | null;
+  fixVersion: string | null;
+  integration: { id: string; name: string; provider: DevProviderName };
+}
+
+/** Intégration proposée depuis un ticket (sans secret). */
+export interface DevIntegrationChoice {
+  id: string;
+  name: string;
+  provider: DevProviderName;
+  project: string;
+}
+
+export interface DevIntegration extends DevIntegrationChoice {
+  isActive: boolean;
+  baseUrl: string | null;
+  account: string | null;
+  hasToken: boolean;
+  issueType: string;
+  statusMap: Record<string, TicketStatus>;
+  webhookUrl: string;
+}
+
 export interface TicketDetail extends Ticket {
+  devLinks: DevLink[];
   children: { id: number; subject: string; status: TicketStatus; priority: Priority; requester: { id: string; name: string } }[];
 }
 

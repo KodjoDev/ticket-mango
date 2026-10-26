@@ -10,6 +10,9 @@ import { authPlugin } from './plugins/auth';
 import { registerErrorHandler } from './plugins/errors';
 import { adminRoutes } from './routes/admin';
 import { agentRoutes, requesterRoutes } from './routes/agents';
+import { devAdminRoutes, devRoutes, devWebhookRoutes } from './routes/dev';
+import { DevService } from './services/dev/service';
+import type { HttpFetch } from './services/dev/providers';
 import { attachmentRoutes } from './routes/attachments';
 import { authRoutes } from './routes/auth';
 import { configRoutes } from './routes/config';
@@ -77,6 +80,8 @@ export interface AppDeps {
   /** Transport d'envoi des e-mails ; journalisation seule si aucun n'est fourni. */
   mailTransport?: MailTransport;
   imapConnector?: ImapConnector;
+  /** Client HTTP des appels sortants vers Jira / GitHub ; fetch par défaut. */
+  devFetch?: HttpFetch;
 }
 
 export async function buildApp({
@@ -88,6 +93,7 @@ export async function buildApp({
   storage = new LocalFileStorage(config.STORAGE_DIR ?? './data'),
   mailTransport,
   imapConnector = imapflowConnector,
+  devFetch = (url, init) => fetch(url, init),
 }: AppDeps) {
   const app = Fastify({ logger, trustProxy: true });
   const publicAppUrl = config.PUBLIC_APP_URL ?? 'http://localhost:5173';
@@ -160,6 +166,7 @@ export async function buildApp({
   const secrets = new SecretBox(config.SECRET_KEY, config.JWT_SECRET);
   const inbound = new InboundService({ prisma, tickets, mailer, config: configService, storage });
   const imapPoller = new ImapPoller(prisma, inbound, secrets, imapConnector);
+  const dev = new DevService({ prisma, tickets, secrets, publicAppUrl, fetcher: devFetch });
   const macros = new MacroService(prisma, configService, tickets);
   const meetings = new MeetingService({
     prisma,
@@ -182,22 +189,26 @@ export async function buildApp({
   await app.register(notificationRoutes, { prefix: '/notifications', notifications });
   await app.register(developerRoutes, { prefix: '/developers', prisma });
   await app.register(macroRoutes, { prefix: '/macros', macros });
+  await app.register(devRoutes, { prefix: '/dev', dev });
   await app.register(spellcheckRoutes, { prefix: '/spellcheck', client: spellchecker });
 
   // Accès publics (jeton secret dans l'URL)
   await app.register(bookingRoutes, { prefix: '/public/bookings', meetings });
   await app.register(inboundRoutes, { prefix: '/inbound', prisma, inbound });
+  await app.register(devWebhookRoutes, { prefix: '/inbound', prisma, dev });
 
   // Administration
   await app.register(routingAdminRoutes, { prefix: '/admin', prisma, config: configService });
   await app.register(macroAdminRoutes, { prefix: '/admin/macros', prisma, macros });
+  const publicApiUrl = config.PUBLIC_API_URL ?? `${publicAppUrl.replace(/\/$/, '')}/api`;
+  await app.register(devAdminRoutes, { prefix: '/admin', prisma, secrets, publicApiUrl });
   await app.register(emailAdminRoutes, {
     prefix: '/admin',
     prisma,
     inbound,
     poller: imapPoller,
     secrets,
-    publicApiUrl: config.PUBLIC_API_URL ?? `${publicAppUrl.replace(/\/$/, '')}/api`,
+    publicApiUrl,
   });
 
   return app;

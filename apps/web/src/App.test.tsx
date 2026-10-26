@@ -174,6 +174,36 @@ describe('détail d’un ticket', () => {
     expect(screen.queryByLabelText('Rechercher un demandeur')).not.toBeInTheDocument();
   });
 
+  it('crée une issue depuis le ticket et affiche la version de correction', async () => {
+    const link = {
+      id: 'l1',
+      externalKey: 'APP-12',
+      url: 'https://acme.atlassian.net/browse/APP-12',
+      title: 'Erreur 500',
+      externalStatus: 'Done',
+      fixVersion: 'v2.4.1',
+      integration: { id: 'i1', name: 'Jira produit', provider: 'JIRA' as const },
+    };
+    let linked = false;
+    const calls = mockApi({
+      ...detailRoutes(),
+      'GET /dev/integrations': [{ id: 'i1', name: 'Jira produit', provider: 'JIRA', project: 'APP' }],
+      'GET /tickets/42': () => ({ json: makeTicket(linked ? { devLinks: [link], fixedInVersion: 'v2.4.1' } : {}) }),
+      'POST /dev/tickets/42/links': () => {
+        linked = true;
+        return { status: 201, json: { externalKey: 'APP-12', url: link.url } };
+      },
+    });
+    renderApp('/tickets/42');
+
+    await userEvent.click(await screen.findByRole('button', { name: "Créer l'issue" }));
+    await waitFor(() =>
+      expect(calls).toContainEqual(expect.objectContaining({ method: 'POST', path: '/dev/tickets/42/links', body: { integrationId: 'i1' } })),
+    );
+    expect(await screen.findByRole('link', { name: 'APP-12' })).toHaveAttribute('href', link.url);
+    expect(screen.getAllByText(/v2\.4\.1/).length).toBeGreaterThan(0);
+  });
+
   it('masque les actions du support à l’utilisateur externe', async () => {
     mockApi({ ...detailRoutes(external), 'GET /tickets/42/comments': [] });
     renderApp('/tickets/42');

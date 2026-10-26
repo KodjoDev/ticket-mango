@@ -2,6 +2,7 @@ import type { Channel, Prisma, PrismaClient, Ticket } from '@prisma/client';
 import {
   canTransition,
   computePriority,
+  STATUS_TRANSITIONS,
   DEFAULT_TICKET_TYPE,
   hasPermission,
   isOpenStatus,
@@ -122,6 +123,26 @@ type Filters = Omit<ListTicketsFilters, 'page' | 'pageSize'>;
 const QUALIFICATION_FIELDS = ['type', 'component', 'environment', 'impact', 'urgency', 'tagIds'] as const;
 const OPEN_STATUSES = TICKET_STATUSES.filter(isOpenStatus);
 
+/** Plus court chemin du workflow entre deux statuts ouverts (RESOLVED et CLOSED exclus), sans le point de départ. */
+function workflowPath(from: TicketStatus, to: TicketStatus): TicketStatus[] | null {
+  const previous = new Map<TicketStatus, TicketStatus>();
+  const queue: TicketStatus[] = [from];
+  while (queue.length > 0) {
+    const status = queue.shift()!;
+    if (status === to) {
+      const path: TicketStatus[] = [];
+      for (let s: TicketStatus = to; s !== from; s = previous.get(s)!) path.unshift(s);
+      return path;
+    }
+    for (const next of STATUS_TRANSITIONS[status]) {
+      if (!isOpenStatus(next) || next === from || previous.has(next)) continue;
+      previous.set(next, status);
+      queue.push(next);
+    }
+  }
+  return null;
+}
+
 /** Rôles qui interviennent sur les tickets pour le compte du support. */
 export const isStaff = (user: CurrentUser) => hasPermission(user.role, 'ticket:qualify');
 
@@ -196,15 +217,23 @@ export class TicketService {
 
   /** Détail avec les tickets rattachés, pour la page d'un ticket référent. */
   async getDetail(user: CurrentUser, id: number) {
-    const [ticket, children] = await Promise.all([
+    const [ticket, children, devLinks] = await Promise.all([
       this.getVisible(user, id),
       this.prisma.ticket.findMany({
         where: { parentId: id, ...this.visibilityFilter(user) },
         select: { id: true, subject: true, status: true, priority: true, requester: { select: { id: true, name: true } } },
         orderBy: { id: 'asc' },
       }),
+      // Les liens vers l'outil de développement sont réservés au support et aux développeurs.
+      hasPermission(user.role, 'ticket:read:all')
+        ? this.prisma.devLink.findMany({
+            where: { ticketId: id },
+            select: { id: true, externalKey: true, url: true, title: true, externalStatus: true, fixVersion: true, integration: { select: { id: true, name: true, provider: true } } },
+            orderBy: { createdAt: 'asc' },
+          })
+        : [],
     ]);
-    return { ...ticket, children };
+    return { ...ticket, children, devLinks };
   }
 
   /** Rattache le ticket à un ticket référent (un seul niveau), ou le détache avec `null`. */
@@ -518,8 +547,28 @@ export class TicketService {
     });
   }
 
+  /**
+   * Amène le ticket au statut demandé par l'équipe de développement, en enchaînant les transitions
+   * du workflow (ex. Qualification → Transmis aux dev → En cours). Un ticket résolu ou clôturé n'est
+   * jamais touché. Renvoie `false` si rien n'a changé.
+   */
+  async advanceFromDev(ticketId: number, target: TicketStatus) {
+    return this.prisma.$transaction(async (tx) => {
+      const current = await tx.ticket.findUnique({ where: { id: ticketId } });
+      if (!current || !isOpenStatus(current.status) || current.status === target) return false;
+      const path = workflowPath(current.status, target);
+      if (!path) return false;
+      let from: Ticket = current;
+      for (const to of path) {
+        await this.applyTransition(tx, null, from, to, true);
+        from = { ...from, status: to };
+      }
+      return true;
+    });
+  }
+
   /** Change le statut et tient à jour les suspensions du délai de résolution. */
-  private async applyTransition(tx: Tx, actorId: string, current: Ticket, to: TicketStatus, auto: boolean) {
+  private async applyTransition(tx: Tx, actorId: string | null, current: Ticket, to: TicketStatus, auto: boolean) {
     if (!canTransition(current.status, to)) {
       throw conflict(`Transition interdite : ${current.status} → ${to}`);
     }
