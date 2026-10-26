@@ -183,6 +183,9 @@ model Ticket {
   slaAlerts      SlaAlert[]
   notifications  Notification[]
   attachments    Attachment[]
+  devLinks       DevLink[]
+  /// Version de correction (« Fixed in v2.4.1 »), reprise de l'outil de développement.
+  fixedInVersion String?
   outboundEmails OutboundEmail[]
 
   @@index([status])
@@ -193,6 +196,57 @@ model Ticket {
   @@index([priority])
   @@index([assigneeId])
   @@index([requesterId])
+}
+
+/// Outil de suivi des développements (Jira, GitHub) relié au support.
+model DevIntegration {
+  id           String      @id @default(uuid()) @db.Uuid
+  provider     DevProvider
+  name         String
+  isActive     Boolean     @default(true)
+  /// Jira : URL du site (https://acme.atlassian.net). GitHub : vide (api.github.com) ou URL d'API Enterprise.
+  baseUrl      String?
+  /// Jira : e-mail du compte porteur du jeton.
+  account      String?
+  /// Jeton d'API chiffré (AES-256-GCM) ; jamais renvoyé par l'API.
+  tokenEnc     String?
+  /// Jira : clé de projet (ex. APP). GitHub : dépôt « propriétaire/nom ».
+  project      String
+  /// Jira : type d'issue créé depuis un ticket (ex. Bug).
+  issueType    String      @default("Bug")
+  /// Statut externe (minuscules) → statut du ticket.
+  statusMap    Json
+  /// Jeton secret de l'URL du webhook entrant.
+  webhookToken String      @unique
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  links        DevLink[]
+}
+
+enum DevProvider {
+  JIRA
+  GITHUB
+}
+
+/// Issue externe liée à un ticket.
+model DevLink {
+  id             String         @id @default(uuid()) @db.Uuid
+  ticketId       Int
+  ticket         Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  integrationId  String         @db.Uuid
+  integration    DevIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  /// Jira : PROJ-12. GitHub : owner/repo#34.
+  externalKey    String
+  url            String
+  title          String
+  externalStatus String?
+  fixVersion     String?
+  createdAt      DateTime       @default(now())
+  syncedAt       DateTime?
+
+  @@unique([integrationId, externalKey, ticketId])
+  @@index([ticketId])
+  @@index([integrationId, externalKey])
 }
 
 model Comment {

@@ -137,6 +137,8 @@ export function makeTicket(overrides: Partial<TicketDetail> = {}): TicketDetail 
     attachments: [],
     childCount: 0,
     children: [],
+    devLinks: [],
+    fixedInVersion: null,
     awaitingAgent: false,
     lastRequesterReplyAt: null,
     lastAgentReplyAt: null,

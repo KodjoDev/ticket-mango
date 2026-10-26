@@ -13,3 +13,4 @@ export const notFound = (message = 'Ressource introuvable') => new HttpError(404
 export const forbidden = (message = 'Permission insuffisante') => new HttpError(403, message);
 export const conflict = (message: string) => new HttpError(409, message);
 export const badRequest = (message: string) => new HttpError(400, message);
+export const badGateway = (message: string) => new HttpError(502, message);

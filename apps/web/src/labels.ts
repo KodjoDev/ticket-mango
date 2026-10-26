@@ -6,6 +6,9 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'ticket.updated': 'a modifié le ticket',
   'ticket.status_changed': 'a changé le statut',
   'comment.created': 'a ajouté un commentaire',
+  'ticket.dev_linked': 'a lié une issue de développement',
+  'ticket.dev_unlinked': 'a détaché une issue de développement',
+  'ticket.dev_synced': 'synchronisation avec l’outil de développement',
 };
 
 const LIST_FIELDS: Record<string, OptionField> = { type: 'TYPE', component: 'COMPONENT', environment: 'ENVIRONMENT' };
@@ -21,6 +24,7 @@ export const FIELD_LABELS: Record<string, string> = {
   priority: 'Priorité',
   priorityOverridden: 'Priorité forcée',
   requester: 'Demandeur',
+  fixedInVersion: 'Corrigé dans la version',
   assigneeId: 'Assigné',
   status: 'Statut',
   tags: 'Tags',

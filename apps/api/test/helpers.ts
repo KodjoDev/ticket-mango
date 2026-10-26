@@ -17,20 +17,32 @@ export interface TestContext {
   storage: MemoryFileStorage;
   /** E-mails « envoyés » pendant le test. */
   mail: MemoryTransport;
+  /** Appels sortants vers Jira / GitHub ; répondre via `respond`. */
+  devCalls: { url: string; method: string; body: unknown }[];
+  respond: { current: (url: string, method: string, body: unknown) => unknown };
 }
 
 export async function setup(): Promise<TestContext> {
   const prisma = new PrismaClient();
   const storage = new MemoryFileStorage();
   const mail = new MemoryTransport();
+  const devCalls: TestContext['devCalls'] = [];
+  const respond: TestContext['respond'] = { current: () => ({}) };
   const app = await buildApp({
+    devFetch: async (url, init) => {
+      const method = init?.method ?? 'GET';
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      devCalls.push({ url, method, body });
+      const json = respond.current(url, method, body);
+      return new Response(JSON.stringify(json), { status: json === null ? 404 : 200 });
+    },
     prisma,
     storage,
     mailTransport: mail,
     config: { JWT_SECRET: 'x'.repeat(32), JWT_EXPIRES_IN: '1h', LOGIN_RATE_LIMIT: 10_000, COOKIE_SECURE: false },
   });
   await app.ready();
-  return { app, prisma, storage, mail };
+  return { app, prisma, storage, mail, devCalls, respond };
 }
 
 export async function teardown({ app, prisma }: TestContext) {
@@ -76,7 +88,7 @@ const SEEDED_MACROS = [
 
 export async function resetDb(prisma: PrismaClient) {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE "Attachment", "OutboundEmail", "InboundEmail", "Mailbox", "AuditLog", "Comment", "TicketTag", "Tag", "MeetingAttendee", "MeetingSlot", "Meeting", "Notification", "SlaAlert", "SlaPause", "GroupMember", "RoutingRule", "Group", "Ticket", "User", "Setting", "View" RESTART IDENTITY CASCADE',
+    'TRUNCATE "DevLink", "DevIntegration", "Attachment", "OutboundEmail", "InboundEmail", "Mailbox", "AuditLog", "Comment", "TicketTag", "Tag", "MeetingAttendee", "MeetingSlot", "Meeting", "Notification", "SlaAlert", "SlaPause", "GroupMember", "RoutingRule", "Group", "Ticket", "User", "Setting", "View" RESTART IDENTITY CASCADE',
   );
   // Groupes et règles de routage tels que créés par la migration.
   await prisma.group.createMany({ data: DEFAULT_GROUPS.map((g, position) => ({ ...g, position })) });

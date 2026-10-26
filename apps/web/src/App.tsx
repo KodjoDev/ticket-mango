@@ -6,6 +6,7 @@ import { Layout } from './components/Layout';
 import { AdminIndex, AdminLayout, RequirePermission } from './pages/admin/AdminLayout';
 import { GroupsAdmin } from './pages/admin/GroupsAdmin';
 import { LayoutAdmin } from './pages/admin/LayoutAdmin';
+import { DevAdmin } from './pages/admin/DevAdmin';
 import { MailAdmin } from './pages/admin/MailAdmin';
 import { RoutingAdmin } from './pages/admin/RoutingAdmin';
 import { SlaAdmin } from './pages/admin/SlaAdmin';
@@ -45,6 +46,7 @@ export function AppRoutes() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminIndex />} />
           <Route path="users" element={<RequirePermission permission="user:manage"><UsersAdmin /></RequirePermission>} />
+          <Route path="dev" element={<RequirePermission permission="settings:manage"><DevAdmin /></RequirePermission>} />
           <Route path="mail" element={<RequirePermission permission="settings:manage"><MailAdmin /></RequirePermission>} />
           <Route path="groups" element={<RequirePermission permission="settings:manage"><GroupsAdmin /></RequirePermission>} />
           <Route path="routing" element={<RequirePermission permission="settings:manage"><RoutingAdmin /></RequirePermission>} />
