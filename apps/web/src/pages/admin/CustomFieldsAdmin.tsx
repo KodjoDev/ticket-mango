@@ -1,35 +1,49 @@
-import { useQuery } from '@tanstack/react-query';
-import { CUSTOM_FIELD_KEY_PATTERN, CUSTOM_FIELD_KIND_LABELS, CUSTOM_FIELD_KINDS, type CustomFieldKind } from '@ticketing/shared';
-import { useState, type FormEvent } from 'react';
-import { adminApi } from '../../api/client';
-import type { CustomField } from '../../api/types';
-import { ErrorMessage, Field, Spinner } from '../../components/ui';
-import { useAdminMutation } from './common';
+import { useQuery } from "@tanstack/react-query";
+import {
+  CUSTOM_FIELD_KEY_PATTERN,
+  CUSTOM_FIELD_KIND_LABELS,
+  CUSTOM_FIELD_KINDS,
+  type CustomFieldKind,
+} from "@ticketing/shared";
+import { useState, type FormEvent } from "react";
+import { adminApi } from "../../api/client";
+import type { CustomField } from "../../api/types";
+import { ErrorMessage, Field, Spinner } from "../../components/ui";
+import { useAdminMutation } from "./common";
 
-const KEY = ['admin', 'custom-fields'];
+const KEY = ["admin", "custom-fields"];
 
 /** Clé proposée à partir du libellé : « N° client » → n_client. */
 function keyFromLabel(label: string) {
   const key = label
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
   return /^[a-z]/.test(key) ? key.slice(0, 40) : `champ_${key}`.slice(0, 40);
 }
 
-function FieldForm({ field, onDone }: { field?: CustomField; onDone: () => void }) {
+function FieldForm({
+  field,
+  onDone,
+}: {
+  field?: CustomField;
+  onDone: () => void;
+}) {
   const [f, setF] = useState({
-    label: field?.label ?? '',
-    key: field?.key ?? '',
-    kind: (field?.kind ?? 'TEXT') as CustomFieldKind,
-    options: (field?.options ?? []).join('\n'),
+    label: field?.label ?? "",
+    key: field?.key ?? "",
+    kind: (field?.kind ?? "TEXT") as CustomFieldKind,
+    options: (field?.options ?? []).join("\n"),
     required: field?.required ?? false,
     forRequester: field?.forRequester ?? false,
   });
   const [keyTouched, setKeyTouched] = useState(false);
-  const choices = f.options.split('\n').map((o) => o.trim()).filter(Boolean);
+  const choices = f.options
+    .split("\n")
+    .map((o) => o.trim())
+    .filter(Boolean);
   const save = useAdminMutation(
     () =>
       field
@@ -37,17 +51,17 @@ function FieldForm({ field, onDone }: { field?: CustomField; onDone: () => void 
             label: f.label,
             required: f.required,
             forRequester: f.forRequester,
-            ...(field.kind === 'SELECT' && { options: choices }),
+            ...(field.kind === "SELECT" && { options: choices }),
           })
         : adminApi.createCustomField({
             key: f.key,
             label: f.label,
             kind: f.kind,
-            required: f.kind !== 'CHECKBOX' && f.required,
+            required: f.kind !== "CHECKBOX" && f.required,
             forRequester: f.forRequester,
-            ...(f.kind === 'SELECT' && { options: choices }),
+            ...(f.kind === "SELECT" && { options: choices }),
           }),
-    [KEY, ['config']],
+    [KEY, ["config"]],
   );
   const kind = field?.kind ?? f.kind;
   const onSubmit = (e: FormEvent) => {
@@ -56,7 +70,7 @@ function FieldForm({ field, onDone }: { field?: CustomField; onDone: () => void 
   };
   return (
     <form className="card" onSubmit={onSubmit}>
-      <h2>{field ? `Modifier ${field.label}` : 'Nouveau champ'}</h2>
+      <h2>{field ? `Modifier ${field.label}` : "Nouveau champ"}</h2>
       <ErrorMessage error={save.error} />
       <div className="grid-3">
         <Field label="Libellé">
@@ -64,11 +78,24 @@ function FieldForm({ field, onDone }: { field?: CustomField; onDone: () => void 
             required
             maxLength={100}
             value={f.label}
-            onChange={(e) => setF({ ...f, label: e.target.value, ...(!field && !keyTouched && { key: keyFromLabel(e.target.value) }) })}
+            onChange={(e) =>
+              setF({
+                ...f,
+                label: e.target.value,
+                ...(!field &&
+                  !keyTouched && { key: keyFromLabel(e.target.value) }),
+              })
+            }
           />
         </Field>
         <Field label="Type">
-          <select value={kind} disabled={!!field} onChange={(e) => setF({ ...f, kind: e.target.value as CustomFieldKind })}>
+          <select
+            value={kind}
+            disabled={!!field}
+            onChange={(e) =>
+              setF({ ...f, kind: e.target.value as CustomFieldKind })
+            }
+          >
             {CUSTOM_FIELD_KINDS.map((k) => (
               <option key={k} value={k}>
                 {CUSTOM_FIELD_KIND_LABELS[k]}
@@ -89,20 +116,33 @@ function FieldForm({ field, onDone }: { field?: CustomField; onDone: () => void 
           />
         </Field>
       </div>
-      {kind === 'SELECT' && (
+      {kind === "SELECT" && (
         <Field label="Choix (un par ligne)">
-          <textarea required rows={4} value={f.options} onChange={(e) => setF({ ...f, options: e.target.value })} />
+          <textarea
+            required
+            rows={4}
+            value={f.options}
+            onChange={(e) => setF({ ...f, options: e.target.value })}
+          />
         </Field>
       )}
       <div className="actions">
-        {kind !== 'CHECKBOX' && (
+        {kind !== "CHECKBOX" && (
           <label className="checkbox">
-            <input type="checkbox" checked={f.required} onChange={(e) => setF({ ...f, required: e.target.checked })} />
+            <input
+              type="checkbox"
+              checked={f.required}
+              onChange={(e) => setF({ ...f, required: e.target.checked })}
+            />
             Obligatoire à la création
           </label>
         )}
         <label className="checkbox">
-          <input type="checkbox" checked={f.forRequester} onChange={(e) => setF({ ...f, forRequester: e.target.checked })} />
+          <input
+            type="checkbox"
+            checked={f.forRequester}
+            onChange={(e) => setF({ ...f, forRequester: e.target.checked })}
+          />
           Visible et saisissable par le demandeur
         </label>
       </div>
@@ -119,10 +159,20 @@ function FieldForm({ field, onDone }: { field?: CustomField; onDone: () => void 
 }
 
 export function CustomFieldsAdmin() {
-  const { data, error, isPending } = useQuery({ queryKey: KEY, queryFn: adminApi.customFields });
-  const [editing, setEditing] = useState<CustomField | 'new' | null>(null);
-  const reorder = useAdminMutation(adminApi.reorderCustomFields, [KEY, ['config']]);
-  const toggle = useAdminMutation(({ id, isActive }: { id: string; isActive: boolean }) => adminApi.updateCustomField(id, { isActive }), [KEY, ['config']]);
+  const { data, error, isPending } = useQuery({
+    queryKey: KEY,
+    queryFn: adminApi.customFields,
+  });
+  const [editing, setEditing] = useState<CustomField | "new" | null>(null);
+  const reorder = useAdminMutation(adminApi.reorderCustomFields, [
+    KEY,
+    ["config"],
+  ]);
+  const toggle = useAdminMutation(
+    ({ id, isActive }: { id: string; isActive: boolean }) =>
+      adminApi.updateCustomField(id, { isActive }),
+    [KEY, ["config"]],
+  );
 
   function move(index: number, delta: number) {
     const ids = (data ?? []).map((x) => x.id);
@@ -133,20 +183,32 @@ export function CustomFieldsAdmin() {
   }
 
   return (
-    <div className="admin-section">
-      {editing && <FieldForm key={editing === 'new' ? 'new' : editing.id} field={editing === 'new' ? undefined : editing} onDone={() => setEditing(null)} />}
+    <>
+      {editing && (
+        <FieldForm
+          key={editing === "new" ? "new" : editing.id}
+          field={editing === "new" ? undefined : editing}
+          onDone={() => setEditing(null)}
+        />
+      )}
       <section className="card">
         <div className="section-header">
-          <h2>Champs du ticket</h2>
+          <h2>Champs personnalisés</h2>
           {!editing && (
-            <button type="button" className="primary" onClick={() => setEditing('new')}>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => setEditing("new")}
+            >
               Nouveau champ
             </button>
           )}
         </div>
         <p className="muted small">
-          Champs ajoutés au formulaire de création et à la fiche du ticket, après les champs de qualification. Un champ n’est jamais supprimé : on l’archive, et
-          les valeurs déjà saisies sont conservées. Les modifications du support sont journalisées.
+          Champs ajoutés au formulaire de création et à la fiche du ticket,
+          après les champs de qualification. Un champ n’est jamais supprimé : on
+          l’archive, et les valeurs déjà saisies sont conservées. Les
+          modifications du support sont journalisées.
         </p>
         <ErrorMessage error={error ?? reorder.error ?? toggle.error} />
         {isPending ? (
@@ -156,29 +218,59 @@ export function CustomFieldsAdmin() {
         ) : (
           <ul className="mailboxes">
             {data?.map((field, i) => (
-              <li key={field.id} className={field.isActive ? 'mailbox' : 'mailbox inactive'}>
+              <li
+                key={field.id}
+                className={field.isActive ? "mailbox" : "mailbox inactive"}
+              >
                 <div className="mailbox-head">
                   <span className="view-name">
                     <strong>{field.label}</strong>
                     <span className="muted small">
                       {CUSTOM_FIELD_KIND_LABELS[field.kind]} · {field.key}
-                      {field.required && ' · obligatoire'}
-                      {field.forRequester && ' · ouvert au demandeur'}
+                      {field.required && " · obligatoire"}
+                      {field.forRequester && " · ouvert au demandeur"}
                     </span>
                   </span>
                   <span className="row-actions">
-                    {!field.isActive && <span className="badge archived-badge">Archivé</span>}
-                    <button type="button" className="link" aria-label={`Monter ${field.label}`} disabled={i === 0} onClick={() => move(i, -1)}>
+                    {!field.isActive && (
+                      <span className="badge archived-badge">Archivé</span>
+                    )}
+                    <button
+                      type="button"
+                      className="link"
+                      aria-label={`Monter ${field.label}`}
+                      disabled={i === 0}
+                      onClick={() => move(i, -1)}
+                    >
                       ↑
                     </button>
-                    <button type="button" className="link" aria-label={`Descendre ${field.label}`} disabled={i === data.length - 1} onClick={() => move(i, 1)}>
+                    <button
+                      type="button"
+                      className="link"
+                      aria-label={`Descendre ${field.label}`}
+                      disabled={i === data.length - 1}
+                      onClick={() => move(i, 1)}
+                    >
                       ↓
                     </button>
-                    <button type="button" className="link" onClick={() => setEditing(field)}>
+                    <button
+                      type="button"
+                      className="link"
+                      onClick={() => setEditing(field)}
+                    >
                       Modifier
                     </button>
-                    <button type="button" className="link" onClick={() => toggle.mutate({ id: field.id, isActive: !field.isActive })}>
-                      {field.isActive ? 'Archiver' : 'Restaurer'}
+                    <button
+                      type="button"
+                      className="link"
+                      onClick={() =>
+                        toggle.mutate({
+                          id: field.id,
+                          isActive: !field.isActive,
+                        })
+                      }
+                    >
+                      {field.isActive ? "Archiver" : "Restaurer"}
                     </button>
                   </span>
                 </div>
@@ -187,6 +279,6 @@ export function CustomFieldsAdmin() {
           </ul>
         )}
       </section>
-    </div>
+    </>
   );
 }
